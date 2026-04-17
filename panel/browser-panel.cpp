@@ -462,6 +462,41 @@ void QCefWidgetInternal::allowAllPopups(bool allow)
 	allowAllPopups_ = allow;
 }
 
+void QCefWidgetInternal::findText(const std::string &text, bool forward, bool matchCase, bool findNext_)
+{
+	if (!cefBrowser)
+		return;
+
+	bool isNewSearch = text != lastSearchText_;
+	lastSearchText_ = text;
+
+	CefRefPtr<CefBrowserHost> host = cefBrowser->GetHost();
+
+	if (text.empty()) {
+		QueueCEFTask([host]() { host->StopFinding(true); });
+		return;
+	}
+
+	bool useNext = findNext_ && !isNewSearch;
+	QueueCEFTask([host, text, forward, matchCase, useNext]() {
+		host->Find(text, forward, matchCase, useNext);
+	});
+}
+
+void QCefWidgetInternal::requestFind()
+{
+	emit findRequested();
+}
+
+void QCefWidgetInternal::stopFinding(bool clearSelection)
+{
+	if (!cefBrowser)
+		return;
+
+	CefRefPtr<CefBrowserHost> host = cefBrowser->GetHost();
+	QueueCEFTask([host, clearSelection]() { host->StopFinding(clearSelection); });
+}
+
 bool QCefWidgetInternal::zoomPage(int direction)
 {
 	if (!cefBrowser || direction < -1 || direction > 1)
@@ -583,7 +618,7 @@ extern "C" EXPORT QCef *obs_browser_create_qcef(void)
 	return new QCefInternal();
 }
 
-#define BROWSER_PANEL_VERSION 3
+#define BROWSER_PANEL_VERSION 4
 
 extern "C" EXPORT int obs_browser_qcef_version_export(void)
 {

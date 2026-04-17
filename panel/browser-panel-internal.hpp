@@ -31,6 +31,7 @@ public:
 	CefRefPtr<CefBrowser> cefBrowser;
 	std::string url;
 	std::string script;
+	std::string lastSearchText_;
 	CefRefPtr<CefRequestContext> rqc;
 	QTimer timer;
 #ifndef __APPLE__
@@ -50,6 +51,9 @@ public:
 	virtual void reloadPage() override;
 	virtual bool zoomPage(int direction) override;
 	virtual void executeJavaScript(const std::string &script) override;
+	virtual void findText(const std::string &text, bool forward, bool matchCase,
+			      bool findNext = false) override;
+	virtual void stopFinding(bool clearSelection) override;
 
 	void finishCloseBrowser();
 	void Resize();
@@ -62,6 +66,7 @@ private:
 
 public slots:
 	void Init();
+	void requestFind();
 
 signals:
 	void readyToClose();

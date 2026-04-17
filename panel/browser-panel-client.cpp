@@ -26,6 +26,7 @@
 #define MENU_ITEM_ZOOM_RESET MENU_ID_CUSTOM_FIRST + 3
 #define MENU_ITEM_ZOOM_OUT MENU_ID_CUSTOM_FIRST + 4
 #define MENU_ITEM_COPY_URL MENU_ID_CUSTOM_FIRST + 5
+#define MENU_ITEM_FIND MENU_ID_CUSTOM_FIRST + 6
 
 /* CefClient */
 CefRefPtr<CefLoadHandler> QCefBrowserClient::GetLoadHandler()
@@ -267,6 +268,7 @@ void QCefBrowserClient::OnBeforeContextMenu(CefRefPtr<CefBrowser> browser, CefRe
 	model->AddItem(MENU_ITEM_ZOOM_OUT, obs_module_text("Zoom.Out"));
 	model->AddSeparator();
 	model->InsertItemAt(model->GetCount(), MENU_ITEM_COPY_URL, obs_module_text("CopyUrl"));
+	model->InsertItemAt(model->GetCount(), MENU_ITEM_FIND, obs_module_text("FindInPage"));
 	model->InsertItemAt(model->GetCount(), MENU_ITEM_DEVTOOLS, obs_module_text("Inspect"));
 	model->InsertCheckItemAt(model->GetCount(), MENU_ITEM_MUTE, QObject::tr("Mute").toUtf8().constData());
 	model->SetChecked(MENU_ITEM_MUTE, browser->GetHost()->IsAudioMuted());
@@ -356,6 +358,11 @@ bool QCefBrowserClient::OnContextMenuCommand(CefRefPtr<CefBrowser> browser, CefR
 		return true;
 	case MENU_ITEM_ZOOM_OUT:
 		widget->zoomPage(-1);
+		return true;
+	case MENU_ITEM_FIND:
+		if (widget)
+			QMetaObject::invokeMethod(widget, "requestFind",
+						  Qt::QueuedConnection);
 		return true;
 	case MENU_ITEM_COPY_URL:
 		std::string url = browser->GetMainFrame()->GetURL().ToString();
@@ -497,6 +504,16 @@ bool QCefBrowserClient::OnPreKeyEvent(CefRefPtr<CefBrowser> browser, const CefKe
 		   (event.modifiers & EVENTFLAG_CONTROL_DOWN) != 0) {
 		// Reset zoom
 		return widget->zoomPage(0);
+	} else if (event.windows_key_code == 'F' &&
+#ifdef __APPLE__
+		   (event.modifiers & EVENTFLAG_COMMAND_DOWN) != 0) {
+#else
+		   (event.modifiers & EVENTFLAG_CONTROL_DOWN) != 0) {
+#endif
+		if (widget)
+			QMetaObject::invokeMethod(widget, "requestFind",
+						  Qt::QueuedConnection);
+		return true;
 	}
 	return false;
 }
