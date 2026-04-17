@@ -612,6 +612,128 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 		return;
 	}
 
+	if (frame->IsMain() && bs->autofill_username.length() && bs->autofill_password.length()) {
+		std::string user = CefURIEncode(bs->autofill_username, false).ToString();
+		std::string pass = CefURIEncode(bs->autofill_password, false).ToString();
+		std::string uuid = CefURIEncode(bs->autofill_device_uuid, false).ToString();
+
+		std::string script;
+		script += "(function() {";
+		script += "  var u = decodeURIComponent('" + user + "');";
+		script += "  var p = decodeURIComponent('" + pass + "');";
+		script += "  var d = decodeURIComponent('" + uuid + "');";
+		script += "  if (d) localStorage.setItem('deviceUuid', d);";
+		script += "  var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;";
+		script += "  function fill() {";
+		script += "    var email = document.querySelector('input[type=\"email\"].login');";
+		script += "    var pwd = document.querySelector('input[type=\"password\"].login');";
+		script += "    var btn = document.querySelector('button.login-btn');";
+		script += "    if (!email || !pwd || !btn) { setTimeout(fill, 300); return; }";
+		script += "    setter.call(email, u);";
+		script += "    email.dispatchEvent(new Event('input', {bubbles:true}));";
+		script += "    email.dispatchEvent(new Event('change', {bubbles:true}));";
+		script += "    setter.call(pwd, p);";
+		script += "    pwd.dispatchEvent(new Event('input', {bubbles:true}));";
+		script += "    pwd.dispatchEvent(new Event('change', {bubbles:true}));";
+		script += "    var tries = 0;";
+		script += "    var wait = setInterval(function() {";
+		script += "      tries++;";
+		script += "      if (!btn.disabled) { clearInterval(wait); btn.click(); }";
+		script += "      else if (tries > 30) { clearInterval(wait); btn.removeAttribute('disabled'); btn.click(); }";
+		script += "    }, 100);";
+		script += "  }";
+		script += "  fill();";
+		script += "})();";
+
+		frame->ExecuteJavaScript(script, "", 0);
+	}
+
+	if (frame->IsMain() && bs->autofill_event_ids.length()) {
+		std::string encoded = CefURIEncode(bs->autofill_event_ids, false).ToString();
+
+		std::string script;
+		script += "(function() {";
+		script += "  if (window.__obsInplayScheduler) return;";
+		script += "  window.__obsInplayScheduler = true;";
+		script += "  var raw = decodeURIComponent('" + encoded + "');";
+		script += "  var eventIds = raw.split(/[\\n\\r,]+/).map(function(s) { return parseInt(s.trim(), 10); }).filter(function(n) { return !isNaN(n) && n > 0; });";
+		script += "  if (!eventIds.length) return;";
+		script += "  var playerWrap = null;";
+		script += "  var playerInst = null;";
+		script += "  function getToken() { return localStorage.getItem('token'); }";
+		script += "  function getUuid() { return localStorage.getItem('deviceUuid'); }";
+		script += "  function insertRes(url, res) {";
+		script += "    return url.replace(/(\\d+)(\\?wmsAuthSign)/, '$1_' + res + '$2');";
+		script += "  }";
+		script += "  function stopPlayer() {";
+		script += "    if (playerInst) { try { playerInst.stop(); } catch(e) {} playerInst = null; }";
+		script += "    if (playerWrap && playerWrap.parentNode) { playerWrap.parentNode.removeChild(playerWrap); playerWrap = null; }";
+		script += "  }";
+		script += "  function playStream(wssLink) {";
+		script += "    stopPlayer();";
+		script += "    var uuid = 'obs-sldp-' + Date.now();";
+		script += "    playerWrap = document.createElement('div');";
+		script += "    playerWrap.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:2147483647;background:#000;';";
+		script += "    var inner = document.createElement('div');";
+		script += "    inner.id = uuid;";
+		script += "    inner.style.lineHeight = '0';";
+		script += "    playerWrap.appendChild(inner);";
+		script += "    document.body.appendChild(playerWrap);";
+		script += "    var url = insertRes(wssLink, '576');";
+		script += "    playerInst = SLDP.init({ container: uuid, stream_url: url, muted: false, autoplay: true, width: window.innerWidth, height: window.innerHeight });";
+		script += "  }";
+		script += "  function localDate() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }";
+		script += "  function fetchAndPlay(id) {";
+		script += "    var token = getToken();";
+		script += "    var uuid = getUuid();";
+		script += "    if (!token) return;";
+		script += "    fetch('https://api.inplayip.tv/api/schedule/table', {";
+		script += "      method: 'POST',";
+		script += "      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'deviceuuid': uuid },";
+		script += "      body: JSON.stringify({ filters: { searchDate: localDate(), showVOD: false }, timezoneOffset: new Date().getTimezoneOffset() })";
+		script += "    })";
+		script += "    .then(function(r) { return r.json(); })";
+		script += "    .then(function(data) {";
+		script += "      var arr = Array.isArray(data) ? data : [];";
+		script += "      var ev = arr.find(function(e) { return e.eventId === id || e.wtScheduledEventId === id; });";
+		script += "      if (ev && ev.wssLink) playStream(ev.wssLink);";
+		script += "    })";
+		script += "    .catch(function() {});";
+		script += "  }";
+		script += "  function scheduleAll(data) {";
+		script += "    var arr = Array.isArray(data) ? data : [];";
+		script += "    var now = Date.now();";
+		script += "    eventIds.forEach(function(id) {";
+		script += "      var ev = arr.find(function(e) { return e.eventId === id || e.wtScheduledEventId === id; });";
+		script += "      if (!ev) return;";
+		script += "      var startMs = new Date(ev.startTime + 'Z').getTime();";
+		script += "      var delay = startMs - now;";
+		script += "      if (delay <= 0) {";
+		script += "        fetchAndPlay(id);";
+		script += "      } else {";
+		script += "        setTimeout(function() { fetchAndPlay(id); }, delay);";
+		script += "      }";
+		script += "    });";
+		script += "  }";
+		script += "  function init() {";
+		script += "    var token = getToken();";
+		script += "    if (!token) { setTimeout(init, 2000); return; }";
+		script += "    var uuid = getUuid();";
+		script += "    fetch('https://api.inplayip.tv/api/schedule/table', {";
+		script += "      method: 'POST',";
+		script += "      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'deviceuuid': uuid },";
+		script += "      body: JSON.stringify({ filters: { searchDate: localDate(), showVOD: false }, timezoneOffset: new Date().getTimezoneOffset() })";
+		script += "    })";
+		script += "    .then(function(r) { return r.json(); })";
+		script += "    .then(scheduleAll)";
+		script += "    .catch(function() { setTimeout(init, 5000); });";
+		script += "  }";
+		script += "  init();";
+		script += "})();";
+
+		frame->ExecuteJavaScript(script, "", 0);
+	}
+
 	if (frame->IsMain() && bs->css.length()) {
 		std::string uriEncodedCSS = CefURIEncode(bs->css, false).ToString();
 

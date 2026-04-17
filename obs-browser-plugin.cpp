@@ -197,6 +197,12 @@ static obs_properties_t *browser_source_get_properties(void *data)
 
 	obs_property_t *p = obs_properties_add_text(props, "css", obs_module_text("CSS"), OBS_TEXT_MULTILINE);
 	obs_property_text_set_monospace(p, true);
+
+	obs_properties_add_text(props, "autofill_username", obs_module_text("AutofillUsername"), OBS_TEXT_DEFAULT);
+	obs_properties_add_text(props, "autofill_password", obs_module_text("AutofillPassword"), OBS_TEXT_PASSWORD);
+	obs_properties_add_text(props, "autofill_device_uuid", obs_module_text("AutofillDeviceUuid"), OBS_TEXT_DEFAULT);
+	obs_properties_add_text(props, "autofill_event_ids", obs_module_text("AutofillEventIds"), OBS_TEXT_MULTILINE);
+
 	obs_properties_add_bool(props, "shutdown", obs_module_text("ShutdownSourceNotVisible"));
 	obs_properties_add_bool(props, "restart_when_active", obs_module_text("RefreshBrowserActive"));
 
@@ -293,6 +299,7 @@ static void BrowserInit(void)
 	CefString(&settings.log_file) = log_path_abs;
 	settings.windowless_rendering_enabled = true;
 	settings.no_sandbox = true;
+	settings.remote_debugging_port = 9222;
 
 	uint32_t obs_ver = obs_get_version();
 	uint32_t obs_maj = obs_ver >> 24;

@@ -97,6 +97,29 @@ BrowserSource::BrowserSource(obs_data_t *, obs_source_t *source_) : source(sourc
 	proc_handler_add(ph, "void javascript_event(string eventName, string jsonString)", jsEventFunction,
 			 (void *)this);
 
+	auto findTextFunction = [](void *p, calldata_t *calldata) {
+		BrowserSource *bs = static_cast<BrowserSource *>(p);
+		if (bs->destroying)
+			return;
+		const char *text = calldata_string(calldata, "text");
+		bool forward = calldata_bool(calldata, "forward");
+		bool clear = calldata_bool(calldata, "clear");
+		if (clear) {
+			bs->ExecuteOnBrowser(
+				[](CefRefPtr<CefBrowser> browser) { browser->GetHost()->StopFinding(true); },
+				true);
+		} else if (text && *text) {
+			std::string searchText = text;
+			bs->ExecuteOnBrowser(
+				[searchText, forward](CefRefPtr<CefBrowser> browser) {
+					browser->GetHost()->Find(searchText, forward, false, false);
+				},
+				true);
+		}
+	};
+	proc_handler_add(ph, "void find_text(string text, bool forward, bool clear)", findTextFunction,
+			 (void *)this);
+
 	/* defer update */
 	obs_source_update(source, nullptr);
 
@@ -467,6 +490,10 @@ void BrowserSource::Update(obs_data_t *settings)
 		ControlLevel n_webpage_control_level;
 		std::string n_url;
 		std::string n_css;
+		std::string n_autofill_username;
+		std::string n_autofill_password;
+		std::string n_autofill_device_uuid;
+		std::string n_autofill_event_ids;
 
 		n_is_local = obs_data_get_bool(settings, "is_local_file");
 		n_width = (int)obs_data_get_int(settings, "width");
@@ -476,6 +503,10 @@ void BrowserSource::Update(obs_data_t *settings)
 		n_shutdown = obs_data_get_bool(settings, "shutdown");
 		n_restart = obs_data_get_bool(settings, "restart_when_active");
 		n_css = obs_data_get_string(settings, "css");
+		n_autofill_username = obs_data_get_string(settings, "autofill_username");
+		n_autofill_password = obs_data_get_string(settings, "autofill_password");
+		n_autofill_device_uuid = obs_data_get_string(settings, "autofill_device_uuid");
+		n_autofill_event_ids = obs_data_get_string(settings, "autofill_event_ids");
 		n_url = obs_data_get_string(settings, n_is_local ? "local_file" : "url");
 		n_reroute = obs_data_get_bool(settings, "reroute_audio");
 		n_webpage_control_level =
@@ -504,6 +535,9 @@ void BrowserSource::Update(obs_data_t *settings)
 
 		if (n_is_local == is_local && n_fps_custom == fps_custom && n_fps == fps &&
 		    n_shutdown == shutdown_on_invisible && n_restart == restart && n_css == css && n_url == url &&
+		    n_autofill_username == autofill_username && n_autofill_password == autofill_password &&
+		    n_autofill_device_uuid == autofill_device_uuid &&
+		    n_autofill_event_ids == autofill_event_ids &&
 		    n_reroute == reroute_audio && n_webpage_control_level == webpage_control_level) {
 
 			if (n_width == width && n_height == height)
@@ -533,6 +567,10 @@ void BrowserSource::Update(obs_data_t *settings)
 		webpage_control_level = n_webpage_control_level;
 		restart = n_restart;
 		css = n_css;
+		autofill_username = n_autofill_username;
+		autofill_password = n_autofill_password;
+		autofill_device_uuid = n_autofill_device_uuid;
+		autofill_event_ids = n_autofill_event_ids;
 		url = n_url;
 
 		obs_source_set_audio_active(source, reroute_audio);

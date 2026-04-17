@@ -52,6 +52,10 @@ struct BrowserSource {
 
 	std::string url;
 	std::string css;
+	std::string autofill_username;
+	std::string autofill_password;
+	std::string autofill_device_uuid;
+	std::string autofill_event_ids;
 	gs_texture_t *texture = nullptr;
 	gs_texture_t *extra_texture = nullptr;
 	uint32_t last_cx = 0;
