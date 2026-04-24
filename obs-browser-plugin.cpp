@@ -42,6 +42,8 @@
 #include <dxgi.h>
 #include <dxgi1_2.h>
 #include <d3d11.h>
+#include <winhttp.h>
+#include <vector>
 #else
 #include "signal-restore.hpp"
 #endif
@@ -120,6 +122,68 @@ margin: 0px auto; \
 overflow: hidden; \
 }";
 
+#ifdef _WIN32
+static std::string organizer_http_get(const std::string &url_str)
+{
+	if (url_str.empty())
+		return "";
+
+	std::wstring wurl(url_str.begin(), url_str.end());
+
+	wchar_t scheme[8] = {}, host[256] = {}, path[1024] = {}, extra[1024] = {};
+	URL_COMPONENTS uc = {};
+	uc.dwStructSize = sizeof(uc);
+	uc.lpszScheme = scheme;
+	uc.dwSchemeLength = _countof(scheme);
+	uc.lpszHostName = host;
+	uc.dwHostNameLength = _countof(host);
+	uc.lpszUrlPath = path;
+	uc.dwUrlPathLength = _countof(path);
+	uc.lpszExtraInfo = extra;
+	uc.dwExtraInfoLength = _countof(extra);
+
+	if (!WinHttpCrackUrl(wurl.c_str(), 0, 0, &uc))
+		return "";
+
+	bool is_https = (uc.nScheme == INTERNET_SCHEME_HTTPS);
+	INTERNET_PORT port = uc.nPort ? uc.nPort : (is_https ? 443 : 80);
+	std::wstring full_path = std::wstring(path) + std::wstring(extra);
+	DWORD req_flags = is_https ? WINHTTP_FLAG_SECURE : 0;
+
+	HINTERNET hSession =
+		WinHttpOpen(L"OBS-Organizer/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+			    WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+	if (!hSession)
+		return "";
+
+	HINTERNET hConn = WinHttpConnect(hSession, host, port, 0);
+	HINTERNET hReq = nullptr;
+	if (hConn)
+		hReq = WinHttpOpenRequest(hConn, L"GET", full_path.c_str(), nullptr,
+					  WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, req_flags);
+
+	std::string body;
+	if (hReq && WinHttpSendRequest(hReq, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
+				       WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
+	    WinHttpReceiveResponse(hReq, nullptr)) {
+		DWORD avail = 0;
+		while (WinHttpQueryDataAvailable(hReq, &avail) && avail > 0) {
+			std::vector<char> buf(avail + 1, '\0');
+			DWORD bytes_read = 0;
+			WinHttpReadData(hReq, buf.data(), avail, &bytes_read);
+			body.append(buf.data(), bytes_read);
+		}
+	}
+
+	if (hReq)
+		WinHttpCloseHandle(hReq);
+	if (hConn)
+		WinHttpCloseHandle(hConn);
+	WinHttpCloseHandle(hSession);
+	return body;
+}
+#endif
+
 static void browser_source_get_defaults(obs_data_t *settings)
 {
 	obs_data_set_default_string(settings, "url", "https://obsproject.com/browser-source");
@@ -136,6 +200,8 @@ static void browser_source_get_defaults(obs_data_t *settings)
 	obs_data_set_default_int(settings, "webpage_control_level", (int)DEFAULT_CONTROL_LEVEL);
 	obs_data_set_default_string(settings, "css", default_css);
 	obs_data_set_default_bool(settings, "reroute_audio", false);
+	obs_data_set_default_bool(settings, "autofill_event_ids_enabled", true);
+	obs_data_set_default_string(settings, "obs_organizer_url", "http://45.231.132.147:8090");
 }
 
 static bool is_local_file_modified(obs_properties_t *props, obs_property_t *, obs_data_t *settings)
@@ -202,6 +268,89 @@ static obs_properties_t *browser_source_get_properties(void *data)
 	obs_properties_add_text(props, "autofill_password", obs_module_text("AutofillPassword"), OBS_TEXT_PASSWORD);
 	obs_properties_add_text(props, "autofill_device_uuid", obs_module_text("AutofillDeviceUuid"), OBS_TEXT_DEFAULT);
 	obs_properties_add_text(props, "autofill_event_ids", obs_module_text("AutofillEventIds"), OBS_TEXT_MULTILINE);
+	obs_properties_add_bool(props, "autofill_event_ids_enabled", obs_module_text("AutofillEventIdsEnabled"));
+
+	obs_property_t *org_id_prop =
+		obs_properties_add_text(props, "obs_organizer_id", obs_module_text("OrganizerObsId"), OBS_TEXT_DEFAULT);
+	obs_property_set_modified_callback2(
+		org_id_prop,
+		+[](void *priv, obs_properties_t *, obs_property_t *, obs_data_t *settings) -> bool {
+			BrowserSource *source = static_cast<BrowserSource *>(priv);
+			source->obs_organizer_id = obs_data_get_string(settings, "obs_organizer_id");
+			return false;
+		},
+		bs);
+
+	obs_property_t *org_url_prop =
+		obs_properties_add_text(props, "obs_organizer_url", obs_module_text("OrganizerUrl"), OBS_TEXT_DEFAULT);
+	obs_property_set_modified_callback2(
+		org_url_prop,
+		+[](void *priv, obs_properties_t *, obs_property_t *, obs_data_t *settings) -> bool {
+			BrowserSource *source = static_cast<BrowserSource *>(priv);
+			source->obs_organizer_url = obs_data_get_string(settings, "obs_organizer_url");
+			return false;
+		},
+		bs);
+
+	obs_properties_add_button2(
+		props, "fetch_site_games", obs_module_text("FetchSiteGames"),
+		+[](obs_properties_t *, obs_property_t *, void *priv) -> bool {
+			BrowserSource *source = static_cast<BrowserSource *>(priv);
+			std::string obs_id = source->obs_organizer_id;
+			std::string base_url = source->obs_organizer_url;
+			if (obs_id.empty())
+				return false;
+			if (base_url.empty())
+				base_url = "http://45.231.132.147:8090";
+
+			time_t t = time(nullptr);
+			char date_buf[16];
+			struct tm tm_info = {};
+#ifdef _WIN32
+			localtime_s(&tm_info, &t);
+#else
+			localtime_r(&t, &tm_info);
+#endif
+			strftime(date_buf, sizeof(date_buf), "%Y-%m-%d", &tm_info);
+
+			std::string url = base_url + "/jogosdosite/api/eventos?obs_codigo=" + obs_id +
+					  "&data=" + date_buf;
+
+#ifdef _WIN32
+			std::string response = organizer_http_get(url);
+			if (response.empty()) {
+				blog(LOG_WARNING, "[obs-browser] Organizer: sem resposta de %s", url.c_str());
+				return false;
+			}
+			try {
+				auto j = nlohmann::json::parse(response);
+				if (!j.contains("jogos"))
+					return false;
+				std::string event_ids;
+				for (auto &jogo : j["jogos"]) {
+					if (!event_ids.empty())
+						event_ids += "\n";
+					std::string ev_id = jogo.value("event_id", "");
+					std::string hora = jogo.value("hora_inicio", "");
+					std::string nome = jogo.value("nome", "");
+					event_ids += ev_id + " - " + hora + " - " + nome;
+				}
+				OBSDataAutoRelease settings = obs_source_get_settings(source->source);
+				obs_data_set_string(settings, "autofill_event_ids", event_ids.c_str());
+				obs_source_update(source->source, settings);
+				blog(LOG_INFO, "[obs-browser] Organizer: %zu jogos carregados para OBS %s",
+				     j["jogos"].size(), obs_id.c_str());
+				return true;
+			} catch (...) {
+				blog(LOG_WARNING, "[obs-browser] Organizer: erro ao parsear JSON");
+				return false;
+			}
+#else
+			UNUSED_PARAMETER(url);
+			return false;
+#endif
+		},
+		bs);
 
 	obs_properties_add_bool(props, "shutdown", obs_module_text("ShutdownSourceNotVisible"));
 	obs_properties_add_bool(props, "restart_when_active", obs_module_text("RefreshBrowserActive"));

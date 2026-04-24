@@ -494,6 +494,9 @@ void BrowserSource::Update(obs_data_t *settings)
 		std::string n_autofill_password;
 		std::string n_autofill_device_uuid;
 		std::string n_autofill_event_ids;
+		bool n_autofill_event_ids_enabled;
+		std::string n_obs_organizer_id;
+		std::string n_obs_organizer_url;
 
 		n_is_local = obs_data_get_bool(settings, "is_local_file");
 		n_width = (int)obs_data_get_int(settings, "width");
@@ -507,6 +510,9 @@ void BrowserSource::Update(obs_data_t *settings)
 		n_autofill_password = obs_data_get_string(settings, "autofill_password");
 		n_autofill_device_uuid = obs_data_get_string(settings, "autofill_device_uuid");
 		n_autofill_event_ids = obs_data_get_string(settings, "autofill_event_ids");
+		n_autofill_event_ids_enabled = obs_data_get_bool(settings, "autofill_event_ids_enabled");
+		n_obs_organizer_id = obs_data_get_string(settings, "obs_organizer_id");
+		n_obs_organizer_url = obs_data_get_string(settings, "obs_organizer_url");
 		n_url = obs_data_get_string(settings, n_is_local ? "local_file" : "url");
 		n_reroute = obs_data_get_bool(settings, "reroute_audio");
 		n_webpage_control_level =
@@ -533,12 +539,31 @@ void BrowserSource::Update(obs_data_t *settings)
 			n_url = "http://absolute/" + n_url;
 		}
 
-		if (n_is_local == is_local && n_fps_custom == fps_custom && n_fps == fps &&
-		    n_shutdown == shutdown_on_invisible && n_restart == restart && n_css == css && n_url == url &&
-		    n_autofill_username == autofill_username && n_autofill_password == autofill_password &&
-		    n_autofill_device_uuid == autofill_device_uuid &&
-		    n_autofill_event_ids == autofill_event_ids &&
-		    n_reroute == reroute_audio && n_webpage_control_level == webpage_control_level) {
+		bool browser_settings_changed =
+			n_is_local != is_local || n_fps_custom != fps_custom || n_fps != fps ||
+			n_shutdown != shutdown_on_invisible || n_restart != restart || n_css != css ||
+			n_url != url || n_reroute != reroute_audio ||
+			n_webpage_control_level != webpage_control_level;
+
+		if (!browser_settings_changed) {
+			bool only_autofill_changed =
+				n_autofill_username != autofill_username ||
+				n_autofill_password != autofill_password ||
+				n_autofill_device_uuid != autofill_device_uuid ||
+				n_autofill_event_ids != autofill_event_ids ||
+				n_autofill_event_ids_enabled != autofill_event_ids_enabled ||
+				n_obs_organizer_id != obs_organizer_id ||
+				n_obs_organizer_url != obs_organizer_url;
+
+			if (only_autofill_changed) {
+				autofill_username = n_autofill_username;
+				autofill_password = n_autofill_password;
+				autofill_device_uuid = n_autofill_device_uuid;
+				autofill_event_ids = n_autofill_event_ids;
+				autofill_event_ids_enabled = n_autofill_event_ids_enabled;
+				obs_organizer_id = n_obs_organizer_id;
+				obs_organizer_url = n_obs_organizer_url;
+			}
 
 			if (n_width == width && n_height == height)
 				return;
@@ -571,6 +596,9 @@ void BrowserSource::Update(obs_data_t *settings)
 		autofill_password = n_autofill_password;
 		autofill_device_uuid = n_autofill_device_uuid;
 		autofill_event_ids = n_autofill_event_ids;
+		autofill_event_ids_enabled = n_autofill_event_ids_enabled;
+		obs_organizer_id = n_obs_organizer_id;
+		obs_organizer_url = n_obs_organizer_url;
 		url = n_url;
 
 		obs_source_set_audio_active(source, reroute_audio);

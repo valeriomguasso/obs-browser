@@ -1,7 +1,7 @@
 target_compile_options(obs-browser PRIVATE $<IF:$<CONFIG:DEBUG>,/MTd,/MT>)
 target_compile_definitions(obs-browser PRIVATE ENABLE_BROWSER_SHARED_TEXTURE)
 
-target_link_libraries(obs-browser PRIVATE CEF::Wrapper CEF::Library d3d11 dxgi)
+target_link_libraries(obs-browser PRIVATE CEF::Wrapper CEF::Library d3d11 dxgi winhttp)
 target_link_options(obs-browser PRIVATE /IGNORE:4099)
 
 add_executable(obs-browser-helper WIN32 EXCLUDE_FROM_ALL)

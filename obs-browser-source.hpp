@@ -56,6 +56,9 @@ struct BrowserSource {
 	std::string autofill_password;
 	std::string autofill_device_uuid;
 	std::string autofill_event_ids;
+	bool autofill_event_ids_enabled = true;
+	std::string obs_organizer_id;
+	std::string obs_organizer_url;
 	gs_texture_t *texture = nullptr;
 	gs_texture_t *extra_texture = nullptr;
 	uint32_t last_cx = 0;
