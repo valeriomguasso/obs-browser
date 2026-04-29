@@ -556,6 +556,7 @@ void BrowserSource::Update(obs_data_t *settings)
 				n_obs_organizer_url != obs_organizer_url;
 
 			if (only_autofill_changed) {
+				bool prev_enabled = autofill_event_ids_enabled;
 				autofill_username = n_autofill_username;
 				autofill_password = n_autofill_password;
 				autofill_device_uuid = n_autofill_device_uuid;
@@ -563,6 +564,26 @@ void BrowserSource::Update(obs_data_t *settings)
 				autofill_event_ids_enabled = n_autofill_event_ids_enabled;
 				obs_organizer_id = n_obs_organizer_id;
 				obs_organizer_url = n_obs_organizer_url;
+
+				if (prev_enabled && !n_autofill_event_ids_enabled) {
+					ExecuteOnBrowser(
+						[](CefRefPtr<CefBrowser> cefBrowser) {
+							cefBrowser->GetMainFrame()->ExecuteJavaScript(
+								"window.__obsSchedulerStop = true;",
+								"", 0);
+						},
+						true);
+				} else if (!prev_enabled && n_autofill_event_ids_enabled) {
+					ExecuteOnBrowser(
+						[](CefRefPtr<CefBrowser> cefBrowser) {
+							cefBrowser->GetMainFrame()->ExecuteJavaScript(
+								"window.__obsSchedulerStop = false;"
+								" if (typeof window.__obsSchedulerRestart === 'function')"
+								" window.__obsSchedulerRestart();",
+								"", 0);
+						},
+						true);
+				}
 			}
 
 			if (n_width == width && n_height == height)
