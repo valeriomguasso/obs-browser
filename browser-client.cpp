@@ -1196,8 +1196,12 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 		script += "    Object.defineProperty(document, 'hidden', {get: function() { return false; }, configurable: true});";
 		script += "    document.hasFocus = function() { return true; };";
 		script += "  } catch(e) {}";
+		script += "  if (!window.chrome) {";
+		script += "    window.chrome = { runtime: { id: undefined, connect: function(){}, sendMessage: function(){}, onMessage: { addListener: function(){} } }, loadTimes: function(){}, csi: function(){} };";
+		script += "  }";
 		script += "  console.error('[obs-bet365] env: ua=' + navigator.userAgent.substring(0,80));";
-		script += "  console.error('[obs-bet365] env: webdriver=' + navigator.webdriver + ' vis=' + document.visibilityState + ' focus=' + document.hasFocus());";
+		script += "  console.error('[obs-bet365] env: webdriver=' + navigator.webdriver + ' vis=' + document.visibilityState + ' focus=' + document.hasFocus() + ' chrome=' + !!window.chrome);";
+		script += "  console.error('[obs-bet365] env: plugins=' + navigator.plugins.length + ' langs=' + (navigator.languages||[]).join(',') + ' mem=' + navigator.deviceMemory + ' cpu=' + navigator.hardwareConcurrency);";
 		script += "  var u = decodeURIComponent('" + user + "');";
 		script += "  var p = decodeURIComponent('" + pass + "');";
 		script += "  var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;";
