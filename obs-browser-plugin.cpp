@@ -761,58 +761,6 @@ void RegisterSuperbetSource()
 	obs_register_source(&info);
 }
 
-static obs_properties_t *bet365_source_get_properties(void *data)
-{
-	obs_properties_t *props = obs_properties_create();
-	BrowserSource *bs = static_cast<BrowserSource *>(data);
-
-	obs_properties_set_flags(props, OBS_PROPERTIES_DEFER_UPDATE);
-	obs_properties_add_text(props, "url", obs_module_text("URL"), OBS_TEXT_DEFAULT);
-	obs_properties_add_int(props, "width", obs_module_text("Width"), 1, 8192, 1);
-	obs_properties_add_int(props, "height", obs_module_text("Height"), 1, 8192, 1);
-	obs_properties_add_bool(props, "reroute_audio", obs_module_text("RerouteAudio"));
-	obs_properties_add_text(props, "bet365_username", obs_module_text("Bet365Username"), OBS_TEXT_DEFAULT);
-	obs_properties_add_text(props, "bet365_password", obs_module_text("Bet365Password"), OBS_TEXT_PASSWORD);
-	obs_properties_add_text(props, "bet365_event_ids", obs_module_text("Bet365EventIds"), OBS_TEXT_MULTILINE);
-	obs_properties_add_bool(props, "shutdown", obs_module_text("ShutdownSourceNotVisible"));
-	obs_properties_add_bool(props, "restart_when_active", obs_module_text("RefreshBrowserActive"));
-	obs_properties_add_button2(
-		props, "refreshnocache", obs_module_text("RefreshNoCache"),
-		[](obs_properties_t *, obs_property_t *, void *data) {
-			static_cast<BrowserSource *>(data)->Refresh();
-			return false;
-		},
-		bs);
-	return props;
-}
-
-static void bet365_source_get_defaults(obs_data_t *settings)
-{
-	obs_data_set_default_string(settings, "url", "https://www.bet365.com.br/");
-	obs_data_set_default_int(settings, "width", 1920);
-	obs_data_set_default_int(settings, "height", 1080);
-	obs_data_set_default_int(settings, "fps", 30);
-	obs_data_set_default_bool(settings, "fps_custom", false);
-	obs_data_set_default_bool(settings, "shutdown", false);
-	obs_data_set_default_bool(settings, "restart_when_active", false);
-	obs_data_set_default_int(settings, "webpage_control_level", (int)DEFAULT_CONTROL_LEVEL);
-	obs_data_set_default_string(settings, "css", default_css);
-	obs_data_set_default_bool(settings, "reroute_audio", false);
-}
-
-void RegisterBet365Source()
-{
-	struct obs_source_info info = {};
-	SetupBrowserCallbacks(info);
-	info.id = "jogosbet365_source";
-	info.get_properties = bet365_source_get_properties;
-	info.get_defaults = bet365_source_get_defaults;
-	info.get_name = [](void *) {
-		return obs_module_text("Bet365Source");
-	};
-	obs_register_source(&info);
-}
-
 /* ========================================================================= */
 
 extern void DispatchJSEvent(std::string eventName, std::string jsonString, BrowserSource *browser = nullptr);
@@ -1058,7 +1006,6 @@ bool obs_module_load(void)
 	RegisterBrowserSource();
 	RegisterBetfairSource();
 	RegisterSuperbetSource();
-	RegisterBet365Source();
 	obs_frontend_add_event_callback(handle_obs_frontend_event, nullptr);
 
 #ifdef ENABLE_BROWSER_SHARED_TEXTURE

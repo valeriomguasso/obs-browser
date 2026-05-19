@@ -64,9 +64,6 @@ struct BrowserSource {
 	std::string superbet_username;
 	std::string superbet_password;
 	std::string superbet_event_ids;
-	std::string bet365_username;
-	std::string bet365_password;
-	std::string bet365_event_ids;
 	std::string obs_organizer_url;
 	gs_texture_t *texture = nullptr;
 	gs_texture_t *extra_texture = nullptr;
