@@ -1083,12 +1083,17 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 		script += "    var tries = 0;";
 		script += "    var iv = setInterval(function() {";
 		script += "      tries++;";
-		script += "      var frames = document.querySelectorAll('iframe[src*=\"performgroup.com\"]');";
-		script += "      if (frames.length > 0) {";
+		script += "      var frames = document.querySelectorAll('iframe');";
+		script += "      var found = null;";
+		script += "      for (var f = 0; f < frames.length; f++) {";
+		script += "        var src = frames[f].src || '';";
+		script += "        if (src && src.indexOf('superbet') === -1 && src.length > 10) { found = src; break; }";
+		script += "      }";
+		script += "      if (found) {";
 		script += "        clearInterval(iv);";
-		script += "        var url = frames[0].src;";
-		script += "        url = url.replace(/[&?]width=\\d+/, '').replace(/[&?]used=true/, '');";
-		script += "        window.location.href = url;";
+		script += "        found = found.replace(/[&?]width=\\d+/, '').replace(/[&?]used=true/, '');";
+		script += "        var sep = found.indexOf('?') !== -1 ? '&' : '?';";
+		script += "        window.location.href = found + sep + '__obs_player=1';";
 		script += "      }";
 		script += "      if (tries > 20) clearInterval(iv);";
 		script += "    }, 1000);";
@@ -1179,12 +1184,33 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 
 	if (frame->IsMain()) {
 		std::string frameUrl = frame->GetURL().ToString();
-		if (frameUrl.find("performgroup.com") != std::string::npos) {
+		if (frameUrl.find("performgroup.com") != std::string::npos ||
+		    frameUrl.find("__obs_player=1") != std::string::npos) {
 			std::string script;
 			script += "(function() {";
 			script += "  if (window.__obsPerformFull) return;";
 			script += "  window.__obsPerformFull = true;";
+			script += "  var maximized = false;";
+			script += "  var maxSelectors = [";
+			script += "    'button[title*=\"Full\"]', 'button[title*=\"full\"]',";
+			script += "    'button[aria-label*=\"full\" i]', 'button[aria-label*=\"maximiz\" i]',";
+			script += "    '.fullscreen-button', '.vjs-fullscreen-control',";
+			script += "    'button[data-id=\"fullscreen\"]', '[class*=\"fullscreen\"]'";
+			script += "  ];";
+			script += "  function tryMaxBtn() {";
+			script += "    for (var s = 0; s < maxSelectors.length; s++) {";
+			script += "      try {";
+			script += "        var btn = document.querySelector(maxSelectors[s]);";
+			script += "        if (btn && (btn.tagName === 'BUTTON' || btn.getAttribute('role') === 'button')) {";
+			script += "          btn.click(); maximized = true; return true;";
+			script += "        }";
+			script += "      } catch(e) {}";
+			script += "    }";
+			script += "    return false;";
+			script += "  }";
 			script += "  function fill() {";
+			script += "    if (maximized) return;";
+			script += "    if (tryMaxBtn()) return;";
 			script += "    var s = document.documentElement.style;";
 			script += "    s.margin = '0'; s.padding = '0'; s.overflow = 'hidden';";
 			script += "    s.width = '100%'; s.height = '100%'; s.background = '#000';";
@@ -1205,6 +1231,7 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 			script += "  fill();";
 			script += "  setTimeout(fill, 500);";
 			script += "  setTimeout(fill, 2000);";
+			script += "  setTimeout(fill, 4000);";
 			script += "  var mo = new MutationObserver(function() { fill(); });";
 			script += "  setTimeout(function() { if (document.body) mo.observe(document.body, {childList:true, subtree:true}); }, 200);";
 			script += "})();";
