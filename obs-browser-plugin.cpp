@@ -767,6 +767,7 @@ static obs_properties_t *bet365_source_get_properties(void *data)
 	BrowserSource *bs = static_cast<BrowserSource *>(data);
 
 	obs_properties_set_flags(props, OBS_PROPERTIES_DEFER_UPDATE);
+	obs_properties_add_text(props, "url", obs_module_text("URL"), OBS_TEXT_DEFAULT);
 	obs_properties_add_int(props, "width", obs_module_text("Width"), 1, 8192, 1);
 	obs_properties_add_int(props, "height", obs_module_text("Height"), 1, 8192, 1);
 	obs_properties_add_bool(props, "reroute_audio", obs_module_text("RerouteAudio"));
