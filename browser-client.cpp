@@ -1351,7 +1351,8 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 		script += "    }";
 		script += "    for (var i = 0; i < eventIds.length; i++) {";
 		script += "      if (!handled[eventIds[i]]) {";
-		script += "        window.location.href = 'https://www.bet365.com.br/en/#/IP/E/E/' + eventIds[i] + '/';";
+		script += "        var b365Host = window.location.hostname || 'www.bet365.bet.br';";
+		script += "        window.location.href = 'https://' + b365Host + '/en/#/IP/E/E/' + eventIds[i] + '/';";
 		script += "        return;";
 		script += "      }";
 		script += "    }";
