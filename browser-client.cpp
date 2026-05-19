@@ -1205,12 +1205,14 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 		script += "  }";
 		script += "  function tryLogin() {";
 		script += "    var passEl = document.querySelector('input[type=\"password\"]');";
+		script += "    console.error('[obs-bet365] passEl=' + (passEl ? 'found offset=' + (passEl.offsetParent ? 'visible' : 'hidden') : 'null'));";
 		script += "    if (!passEl || passEl.offsetParent === null) return false;";
 		script += "    var userEl = null;";
 		script += "    var inputs = document.querySelectorAll('input[type=\"text\"], input[type=\"email\"], input:not([type])');";
 		script += "    for (var i = 0; i < inputs.length; i++) {";
 		script += "      if (inputs[i].offsetParent !== null) { userEl = inputs[i]; break; }";
 		script += "    }";
+		script += "    console.error('[obs-bet365] userEl=' + (userEl ? 'found name=' + userEl.name + ' type=' + userEl.type : 'null'));";
 		script += "    if (!userEl) return false;";
 		script += "    fillInput(userEl, u);";
 		script += "    setTimeout(function() {";
@@ -1222,6 +1224,7 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 		script += "          if (/login|entrar|submit|log in/i.test(btns[b].textContent)) { btn = btns[b]; break; }";
 		script += "        }";
 		script += "        if (!btn) btn = document.querySelector('input[type=\"submit\"]');";
+		script += "        console.error('[obs-bet365] loginBtn=' + (btn ? btn.tagName + ' text=' + (btn.textContent || '').trim() : 'null'));";
 		script += "        if (btn) {";
 		script += "          btn.click();";
 		script += "          setTimeout(function() { if (window.__obsBet365TriggerSched) window.__obsBet365TriggerSched(); }, 3000);";
@@ -1232,6 +1235,7 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 		script += "  }";
 		script += "  var attempts = 0;";
 		script += "  function poll() {";
+		script += "    console.error('[obs-bet365] poll attempt=' + attempts + ' url=' + window.location.href.substring(0,60));";
 		script += "    if (tryLogin()) return;";
 		script += "    attempts++;";
 		script += "    if (attempts < 30) setTimeout(poll, 1000);";
