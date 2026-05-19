@@ -58,6 +58,12 @@ struct BrowserSource {
 	std::string autofill_event_ids;
 	bool autofill_event_ids_enabled = true;
 	std::string obs_organizer_id;
+	std::string betfair_username;
+	std::string betfair_password;
+	std::string betfair_market_ids;
+	std::string superbet_username;
+	std::string superbet_password;
+	std::string superbet_event_ids;
 	std::string obs_organizer_url;
 	gs_texture_t *texture = nullptr;
 	gs_texture_t *extra_texture = nullptr;

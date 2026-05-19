@@ -421,6 +421,44 @@ static obs_missing_files_t *browser_source_missingfiles(void *data)
 	return files;
 }
 
+static obs_properties_t *betfair_source_get_properties(void *data)
+{
+	obs_properties_t *props = obs_properties_create();
+	BrowserSource *bs = static_cast<BrowserSource *>(data);
+
+	obs_properties_set_flags(props, OBS_PROPERTIES_DEFER_UPDATE);
+	obs_properties_add_int(props, "width", obs_module_text("Width"), 1, 8192, 1);
+	obs_properties_add_int(props, "height", obs_module_text("Height"), 1, 8192, 1);
+	obs_properties_add_bool(props, "reroute_audio", obs_module_text("RerouteAudio"));
+	obs_properties_add_text(props, "betfair_username", obs_module_text("BetfairUsername"), OBS_TEXT_DEFAULT);
+	obs_properties_add_text(props, "betfair_password", obs_module_text("BetfairPassword"), OBS_TEXT_PASSWORD);
+	obs_properties_add_text(props, "betfair_market_ids", obs_module_text("BetfairMarketIds"), OBS_TEXT_MULTILINE);
+	obs_properties_add_bool(props, "shutdown", obs_module_text("ShutdownSourceNotVisible"));
+	obs_properties_add_bool(props, "restart_when_active", obs_module_text("RefreshBrowserActive"));
+	obs_properties_add_button2(
+		props, "refreshnocache", obs_module_text("RefreshNoCache"),
+		[](obs_properties_t *, obs_property_t *, void *data) {
+			static_cast<BrowserSource *>(data)->Refresh();
+			return false;
+		},
+		bs);
+	return props;
+}
+
+static void betfair_source_get_defaults(obs_data_t *settings)
+{
+	obs_data_set_default_string(settings, "url", "https://www.betfair.bet.br/exchange/plus/");
+	obs_data_set_default_int(settings, "width", 1920);
+	obs_data_set_default_int(settings, "height", 1080);
+	obs_data_set_default_int(settings, "fps", 30);
+	obs_data_set_default_bool(settings, "fps_custom", false);
+	obs_data_set_default_bool(settings, "shutdown", false);
+	obs_data_set_default_bool(settings, "restart_when_active", false);
+	obs_data_set_default_int(settings, "webpage_control_level", (int)DEFAULT_CONTROL_LEVEL);
+	obs_data_set_default_string(settings, "css", default_css);
+	obs_data_set_default_bool(settings, "reroute_audio", false);
+}
+
 static CefRefPtr<BrowserApp> app;
 
 static void BrowserInit(void)
@@ -583,20 +621,12 @@ extern "C" EXPORT void obs_browser_initialize(void)
 	}
 }
 
-void RegisterBrowserSource()
+static void SetupBrowserCallbacks(obs_source_info &info)
 {
-	struct obs_source_info info = {};
-	info.id = "browser_source";
 	info.type = OBS_SOURCE_TYPE_INPUT;
 	info.output_flags = OBS_SOURCE_VIDEO | OBS_SOURCE_AUDIO | OBS_SOURCE_CUSTOM_DRAW | OBS_SOURCE_INTERACTION |
 			    OBS_SOURCE_DO_NOT_DUPLICATE | OBS_SOURCE_SRGB;
-	info.get_properties = browser_source_get_properties;
-	info.get_defaults = browser_source_get_defaults;
 	info.icon_type = OBS_ICON_TYPE_BROWSER;
-
-	info.get_name = [](void *) {
-		return obs_module_text("BrowserSource");
-	};
 	info.create = [](obs_data_t *settings, obs_source_t *source) -> void * {
 		obs_browser_initialize();
 		return new BrowserSource(settings, source);
@@ -651,7 +681,83 @@ void RegisterBrowserSource()
 	info.deactivate = [](void *data) {
 		static_cast<BrowserSource *>(data)->SetActive(false);
 	};
+}
 
+void RegisterBrowserSource()
+{
+	struct obs_source_info info = {};
+	SetupBrowserCallbacks(info);
+	info.id = "browser_source";
+	info.get_properties = browser_source_get_properties;
+	info.get_defaults = browser_source_get_defaults;
+	info.get_name = [](void *) {
+		return obs_module_text("BrowserSource");
+	};
+	obs_register_source(&info);
+}
+
+void RegisterBetfairSource()
+{
+	struct obs_source_info info = {};
+	SetupBrowserCallbacks(info);
+	info.id = "jogosbetfair_source";
+	info.get_properties = betfair_source_get_properties;
+	info.get_defaults = betfair_source_get_defaults;
+	info.get_name = [](void *) {
+		return obs_module_text("BetfairSource");
+	};
+	obs_register_source(&info);
+}
+
+static obs_properties_t *superbet_source_get_properties(void *data)
+{
+	obs_properties_t *props = obs_properties_create();
+	BrowserSource *bs = static_cast<BrowserSource *>(data);
+
+	obs_properties_set_flags(props, OBS_PROPERTIES_DEFER_UPDATE);
+	obs_properties_add_int(props, "width", obs_module_text("Width"), 1, 8192, 1);
+	obs_properties_add_int(props, "height", obs_module_text("Height"), 1, 8192, 1);
+	obs_properties_add_bool(props, "reroute_audio", obs_module_text("RerouteAudio"));
+	obs_properties_add_text(props, "superbet_username", obs_module_text("SuperbetUsername"), OBS_TEXT_DEFAULT);
+	obs_properties_add_text(props, "superbet_password", obs_module_text("SuperbetPassword"), OBS_TEXT_PASSWORD);
+	obs_properties_add_text(props, "superbet_event_ids", obs_module_text("SuperbetEventIds"), OBS_TEXT_MULTILINE);
+	obs_properties_add_bool(props, "shutdown", obs_module_text("ShutdownSourceNotVisible"));
+	obs_properties_add_bool(props, "restart_when_active", obs_module_text("RefreshBrowserActive"));
+	obs_properties_add_button2(
+		props, "refreshnocache", obs_module_text("RefreshNoCache"),
+		[](obs_properties_t *, obs_property_t *, void *data) {
+			static_cast<BrowserSource *>(data)->Refresh();
+			return false;
+		},
+		bs);
+	return props;
+}
+
+static void superbet_source_get_defaults(obs_data_t *settings)
+{
+	obs_data_set_default_string(settings, "url",
+				    "https://superbet.bet.br/apostas/futebol/ao-vivo?loqf=video");
+	obs_data_set_default_int(settings, "width", 1920);
+	obs_data_set_default_int(settings, "height", 1080);
+	obs_data_set_default_int(settings, "fps", 30);
+	obs_data_set_default_bool(settings, "fps_custom", false);
+	obs_data_set_default_bool(settings, "shutdown", false);
+	obs_data_set_default_bool(settings, "restart_when_active", false);
+	obs_data_set_default_int(settings, "webpage_control_level", (int)DEFAULT_CONTROL_LEVEL);
+	obs_data_set_default_string(settings, "css", default_css);
+	obs_data_set_default_bool(settings, "reroute_audio", false);
+}
+
+void RegisterSuperbetSource()
+{
+	struct obs_source_info info = {};
+	SetupBrowserCallbacks(info);
+	info.id = "jogossuperbet_source";
+	info.get_properties = superbet_source_get_properties;
+	info.get_defaults = superbet_source_get_defaults;
+	info.get_name = [](void *) {
+		return obs_module_text("SuperbetSource");
+	};
 	obs_register_source(&info);
 }
 
@@ -898,6 +1004,8 @@ bool obs_module_load(void)
 	     cef_version_info(5), cef_version_info(6), cef_version_info(7), CEF_VERSION);
 
 	RegisterBrowserSource();
+	RegisterBetfairSource();
+	RegisterSuperbetSource();
 	obs_frontend_add_event_callback(handle_obs_frontend_event, nullptr);
 
 #ifdef ENABLE_BROWSER_SHARED_TEXTURE

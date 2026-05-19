@@ -107,7 +107,8 @@ std::vector<std::string> exposedFunctions = {"getControlLevel",     "getCurrentS
 					     "setCurrentScene",     "getTransitions",   "getCurrentTransition",
 					     "setCurrentTransition"};
 
-void BrowserApp::OnContextCreated(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame>, CefRefPtr<CefV8Context> context)
+void BrowserApp::OnContextCreated(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame,
+				  CefRefPtr<CefV8Context> context)
 {
 	CefRefPtr<CefV8Value> globalObj = context->GetGlobal();
 
@@ -121,6 +122,40 @@ void BrowserApp::OnContextCreated(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFr
 		CefRefPtr<CefV8Value> func = CefV8Value::CreateFunction(name, this);
 		obsStudioObj->SetValue(name, func, V8_PROPERTY_ATTRIBUTE_NONE);
 	}
+
+#ifdef _WIN32
+	std::string url = frame->GetURL().ToString();
+	if (url.find("betfair") != std::string::npos) {
+		TIME_ZONE_INFORMATION tzi = {};
+		DWORD tzResult = GetTimeZoneInformation(&tzi);
+		int bias = tzi.Bias;
+		if (tzResult == TIME_ZONE_ID_DAYLIGHT)
+			bias += tzi.DaylightBias;
+		else if (tzResult == TIME_ZONE_ID_STANDARD)
+			bias += tzi.StandardBias;
+
+		std::string tzScript = "(function(){"
+				       "var b=" +
+				       std::to_string(bias) +
+				       ";"
+				       "Date.prototype.getTimezoneOffset=function(){return b;};"
+				       "Date.prototype.toISOString=function(){"
+				       "var p=function(n,w){return String(n).padStart(w||2,'0');};"
+				       "var lm=this.getTime()-b*60000;"
+				       "var d=new Date(lm);"
+				       "var s=b<=0?'+':'-';"
+				       "var a=Math.abs(b);"
+				       "return p(d.getUTCFullYear(),4)+'-'+p(d.getUTCMonth()+1)+'-'+p(d.getUTCDate())"
+				       "+'T'+p(d.getUTCHours())+':'+p(d.getUTCMinutes())+':'+p(d.getUTCSeconds())"
+				       "+'.'+p(d.getUTCMilliseconds(),3)+s+p(Math.floor(a/60))+':'+p(a%60);"
+				       "};"
+				       "})();";
+
+		CefRefPtr<CefV8Value> retval;
+		CefRefPtr<CefV8Exception> exception;
+		context->Eval(tzScript, frame->GetURL(), 0, retval, exception);
+	}
+#endif
 
 	UNUSED_PARAMETER(browser);
 }
