@@ -1182,6 +1182,143 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 		frame->ExecuteJavaScript(script, "", 0);
 	}
 
+	if (frame->IsMain() && bs->bet365_username.length() && bs->bet365_password.length()) {
+		std::string user = CefURIEncode(bs->bet365_username, false).ToString();
+		std::string pass = CefURIEncode(bs->bet365_password, false).ToString();
+
+		std::string script;
+		script += "(function() {";
+		script += "  if (window.__obsBet365Login) return;";
+		script += "  window.__obsBet365Login = true;";
+		script += "  if (window.location.hostname.indexOf('bet365') === -1) return;";
+		script += "  var u = decodeURIComponent('" + user + "');";
+		script += "  var p = decodeURIComponent('" + pass + "');";
+		script += "  var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;";
+		script += "  function fillInput(el, val) {";
+		script += "    el.focus();";
+		script += "    el.dispatchEvent(new Event('focus', {bubbles:true}));";
+		script += "    setter.call(el, val);";
+		script += "    el.dispatchEvent(new Event('input', {bubbles:true}));";
+		script += "    el.dispatchEvent(new Event('change', {bubbles:true}));";
+		script += "    el.dispatchEvent(new Event('keyup', {bubbles:true}));";
+		script += "    el.dispatchEvent(new Event('blur', {bubbles:true}));";
+		script += "  }";
+		script += "  function tryLogin() {";
+		script += "    var passEl = document.querySelector('input[type=\"password\"]');";
+		script += "    if (!passEl || passEl.offsetParent === null) return false;";
+		script += "    var userEl = null;";
+		script += "    var inputs = document.querySelectorAll('input[type=\"text\"], input[type=\"email\"], input:not([type])');";
+		script += "    for (var i = 0; i < inputs.length; i++) {";
+		script += "      if (inputs[i].offsetParent !== null) { userEl = inputs[i]; break; }";
+		script += "    }";
+		script += "    if (!userEl) return false;";
+		script += "    fillInput(userEl, u);";
+		script += "    setTimeout(function() {";
+		script += "      fillInput(passEl, p);";
+		script += "      setTimeout(function() {";
+		script += "        var btn = null;";
+		script += "        var btns = document.querySelectorAll('button');";
+		script += "        for (var b = 0; b < btns.length; b++) {";
+		script += "          if (/login|entrar|submit|log in/i.test(btns[b].textContent)) { btn = btns[b]; break; }";
+		script += "        }";
+		script += "        if (!btn) btn = document.querySelector('input[type=\"submit\"]');";
+		script += "        if (btn) {";
+		script += "          btn.click();";
+		script += "          setTimeout(function() { if (window.__obsBet365TriggerSched) window.__obsBet365TriggerSched(); }, 3000);";
+		script += "        }";
+		script += "      }, 400);";
+		script += "    }, 300);";
+		script += "    return true;";
+		script += "  }";
+		script += "  var attempts = 0;";
+		script += "  function poll() {";
+		script += "    if (tryLogin()) return;";
+		script += "    attempts++;";
+		script += "    if (attempts < 30) setTimeout(poll, 1000);";
+		script += "  }";
+		script += "  setTimeout(poll, 1000);";
+		script += "  setInterval(function() {";
+		script += "    var passEl = document.querySelector('input[type=\"password\"]');";
+		script += "    if (passEl && passEl.offsetParent !== null) tryLogin();";
+		script += "  }, 15000);";
+		script += "})();";
+
+		frame->ExecuteJavaScript(script, "", 0);
+	}
+
+	if (frame->IsMain() && bs->bet365_event_ids.length()) {
+		std::string encoded = CefURIEncode(bs->bet365_event_ids, false).ToString();
+
+		std::string script;
+		script += "(function() {";
+		script += "  if (window.__obsBet365Sched) return;";
+		script += "  window.__obsBet365Sched = true;";
+		script += "  if (window.location.hostname.indexOf('bet365') === -1) return;";
+		script += "  var raw = decodeURIComponent('" + encoded + "');";
+		script += "  var eventIds = raw.split(/[\\n\\r,]+/).map(function(s) { return s.trim(); }).filter(Boolean);";
+		script += "  if (!eventIds.length) return;";
+		script += "  function getPageEventId() {";
+		script += "    var h = window.location.hash || '';";
+		script += "    var m = h.match(/\\/E\\/([0-9]+)\\//);";
+		script += "    return m ? m[1] : null;";
+		script += "  }";
+		script += "  function watchIframe() {";
+		script += "    var tries = 0;";
+		script += "    var iv = setInterval(function() {";
+		script += "      tries++;";
+		script += "      var frames = document.querySelectorAll('iframe');";
+		script += "      var found = null;";
+		script += "      for (var f = 0; f < frames.length; f++) {";
+		script += "        var src = frames[f].src || '';";
+		script += "        if (src && src.indexOf('bet365') === -1 && src.length > 10) { found = src; break; }";
+		script += "      }";
+		script += "      if (found) {";
+		script += "        clearInterval(iv);";
+		script += "        found = found.replace(/[&?]width=\\d+/, '').replace(/[&?]used=true/, '');";
+		script += "        var sep = found.indexOf('?') !== -1 ? '&' : '?';";
+		script += "        window.location.href = found + sep + '__obs_player=1';";
+		script += "      }";
+		script += "      if (tries > 30) clearInterval(iv);";
+		script += "    }, 1000);";
+		script += "  }";
+		script += "  function clickWatchBtn() {";
+		script += "    var sels = [";
+		script += "      '.sip-LiveStreamingButton', '[class*=\"LiveStream\"]', '[class*=\"WatchLive\"]',";
+		script += "      '[class*=\"lv-Video\"]', '[class*=\"lv-Watch\"]', '.tv-Icon',";
+		script += "      '[aria-label*=\"Watch\"]', '[title*=\"Watch\"]', '[title*=\"Assistir\"]'";
+		script += "    ];";
+		script += "    for (var s = 0; s < sels.length; s++) {";
+		script += "      var els = document.querySelectorAll(sels[s]);";
+		script += "      for (var i = 0; i < els.length; i++) {";
+		script += "        if (els[i].offsetParent !== null) { els[i].click(); setTimeout(watchIframe, 2000); return true; }";
+		script += "      }";
+		script += "    }";
+		script += "    return false;";
+		script += "  }";
+		script += "  var handled = {};";
+		script += "  function checkAndOpen() {";
+		script += "    var pageId = getPageEventId();";
+		script += "    if (pageId && eventIds.indexOf(pageId) !== -1) {";
+		script += "      if (!handled[pageId]) {";
+		script += "        setTimeout(function() { if (clickWatchBtn()) handled[pageId] = true; }, 2000);";
+		script += "      }";
+		script += "      return;";
+		script += "    }";
+		script += "    for (var i = 0; i < eventIds.length; i++) {";
+		script += "      if (!handled[eventIds[i]]) {";
+		script += "        window.location.href = 'https://www.bet365.com.br/en/#/IP/E/E/' + eventIds[i] + '/';";
+		script += "        return;";
+		script += "      }";
+		script += "    }";
+		script += "  }";
+		script += "  window.__obsBet365TriggerSched = function() { handled = {}; checkAndOpen(); };";
+		script += "  checkAndOpen();";
+		script += "  setInterval(checkAndOpen, 30000);";
+		script += "})();";
+
+		frame->ExecuteJavaScript(script, "", 0);
+	}
+
 	if (frame->IsMain()) {
 		std::string frameUrl = frame->GetURL().ToString();
 		if (frameUrl.find("performgroup.com") != std::string::npos ||

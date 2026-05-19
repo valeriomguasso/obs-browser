@@ -503,6 +503,9 @@ void BrowserSource::Update(obs_data_t *settings)
 		std::string n_superbet_username;
 		std::string n_superbet_password;
 		std::string n_superbet_event_ids;
+		std::string n_bet365_username;
+		std::string n_bet365_password;
+		std::string n_bet365_event_ids;
 
 		n_is_local = obs_data_get_bool(settings, "is_local_file");
 		n_width = (int)obs_data_get_int(settings, "width");
@@ -525,6 +528,9 @@ void BrowserSource::Update(obs_data_t *settings)
 		n_superbet_username = obs_data_get_string(settings, "superbet_username");
 		n_superbet_password = obs_data_get_string(settings, "superbet_password");
 		n_superbet_event_ids = obs_data_get_string(settings, "superbet_event_ids");
+		n_bet365_username = obs_data_get_string(settings, "bet365_username");
+		n_bet365_password = obs_data_get_string(settings, "bet365_password");
+		n_bet365_event_ids = obs_data_get_string(settings, "bet365_event_ids");
 		n_url = obs_data_get_string(settings, n_is_local ? "local_file" : "url");
 		n_reroute = obs_data_get_bool(settings, "reroute_audio");
 		n_webpage_control_level =
@@ -571,7 +577,10 @@ void BrowserSource::Update(obs_data_t *settings)
 				n_betfair_market_ids != betfair_market_ids ||
 				n_superbet_username != superbet_username ||
 				n_superbet_password != superbet_password ||
-				n_superbet_event_ids != superbet_event_ids;
+				n_superbet_event_ids != superbet_event_ids ||
+				n_bet365_username != bet365_username ||
+				n_bet365_password != bet365_password ||
+				n_bet365_event_ids != bet365_event_ids;
 
 			if (only_autofill_changed) {
 				bool prev_enabled = autofill_event_ids_enabled;
@@ -588,6 +597,9 @@ void BrowserSource::Update(obs_data_t *settings)
 				superbet_username = n_superbet_username;
 				superbet_password = n_superbet_password;
 				superbet_event_ids = n_superbet_event_ids;
+				bet365_username = n_bet365_username;
+				bet365_password = n_bet365_password;
+				bet365_event_ids = n_bet365_event_ids;
 
 				if (prev_enabled && !n_autofill_event_ids_enabled) {
 					ExecuteOnBrowser(
@@ -650,6 +662,9 @@ void BrowserSource::Update(obs_data_t *settings)
 		superbet_username = n_superbet_username;
 		superbet_password = n_superbet_password;
 		superbet_event_ids = n_superbet_event_ids;
+		bet365_username = n_bet365_username;
+		bet365_password = n_bet365_password;
+		bet365_event_ids = n_bet365_event_ids;
 		url = n_url;
 
 		obs_source_set_audio_active(source, reroute_audio);
