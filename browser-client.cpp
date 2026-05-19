@@ -1191,6 +1191,13 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 		script += "  if (window.__obsBet365Login) return;";
 		script += "  window.__obsBet365Login = true;";
 		script += "  if (window.location.hostname.indexOf('bet365') === -1) return;";
+		script += "  try {";
+		script += "    Object.defineProperty(document, 'visibilityState', {get: function() { return 'visible'; }, configurable: true});";
+		script += "    Object.defineProperty(document, 'hidden', {get: function() { return false; }, configurable: true});";
+		script += "    document.hasFocus = function() { return true; };";
+		script += "  } catch(e) {}";
+		script += "  console.error('[obs-bet365] env: ua=' + navigator.userAgent.substring(0,80));";
+		script += "  console.error('[obs-bet365] env: webdriver=' + navigator.webdriver + ' vis=' + document.visibilityState + ' focus=' + document.hasFocus());";
 		script += "  var u = decodeURIComponent('" + user + "');";
 		script += "  var p = decodeURIComponent('" + pass + "');";
 		script += "  var setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;";
