@@ -816,6 +816,25 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 		script += "        }, 2000);";
 		script += "      }";
 		script += "    }, 15000);";
+		script += "    function _bfTryPlay() {";
+		script += "      var vid = document.querySelector('video');";
+		script += "      if (!vid) return false;";
+		script += "      if (!vid.paused) { vid.muted = false; vid.volume = 1; return true; }";
+		script += "      if (vid.readyState >= 1) { vid.muted = false; vid.volume = 1; vid.play().catch(function() {}); }";
+		script += "      var pc = vid.parentElement;";
+		script += "      if (pc && pc.parentElement) pc = pc.parentElement;";
+		script += "      if (pc) {";
+		script += "        var btns = pc.querySelectorAll('button,[role=\"button\"],[class*=\"play\" i],[class*=\"Play\"],[class*=\"btn-play\"],[class*=\"playBtn\"]');";
+		script += "        for (var b = 0; b < btns.length; b++) {";
+		script += "          if (btns[b].offsetParent !== null && btns[b].tagName !== 'VIDEO') {";
+		script += "            console.error('[obs-betfair] autoplay click: ' + btns[b].tagName + ' cls=' + String(btns[b].className).substring(0,60) + ' sz=' + btns[b].offsetWidth + 'x' + btns[b].offsetHeight);";
+		script += "            btns[b].click(); return false;";
+		script += "          }";
+		script += "        }";
+		script += "      }";
+		script += "      return false;";
+		script += "    }";
+		script += "    var _bfPt = 0, _bfPiv = setInterval(function() { _bfPt++; if (_bfTryPlay() || _bfPt > 60) clearInterval(_bfPiv); }, 500);";
 		script += "    return;";
 		script += "  }";
 		script += "  if (document.referrer.indexOf('livevideo.betfair') !== -1 || window.location.search.indexOf('obs_relogin') !== -1) {";
@@ -920,33 +939,61 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 		script += "    if (mon !== undefined) d.setMonth(mon, parseInt(m[3]));";
 		script += "    return d;";
 		script += "  }";
+		script += "  var _watchIv = null;";
+		script += "  var _playSelectors = [";
+		script += "    '.vjs-big-play-button',";
+		script += "    '[class*=\"play-overlay\"]',";
+		script += "    '[class*=\"play-button\"]',";
+		script += "    '[class*=\"playBtn\"]',";
+		script += "    '[class*=\"play-btn\"]',";
+		script += "    '[class*=\"PlayButton\"]',";
+		script += "    'button[aria-label*=\"play\" i]',";
+		script += "    'button[aria-label*=\"reproduzir\" i]',";
+		script += "    '.jw-icon-playback',";
+		script += "    '.control-play',";
+		script += "    '[class*=\"bigPlay\"]',";
+		script += "    '[class*=\"big-play\"]'";
+		script += "  ];";
 		script += "  function watchAutoPlay() {";
+		script += "    if (_watchIv) { clearInterval(_watchIv); _watchIv = null; }";
 		script += "    var tries = 0;";
-		script += "    var iv = setInterval(function() {";
+		script += "    console.error('[obs-betfair] watchAutoPlay iniciado');";
+		script += "    _watchIv = setInterval(function() {";
 		script += "      tries++;";
 		script += "      var videos = document.querySelectorAll('video');";
-		script += "      for (var i = 0; i < videos.length; i++) {";
-		script += "        var v = videos[i];";
-		script += "        if (v.paused && v.readyState >= 3) {";
-		script += "          clearInterval(iv);";
-		script += "          v.play().catch(function() {";
-		script += "            var overlay = document.querySelector('.vjs-big-play-button, [class*=\"play-overlay\"], [class*=\"play-button\"]');";
-		script += "            if (overlay && overlay.offsetParent !== null) overlay.click();";
-		script += "          });";
-		script += "          return;";
-		script += "        }";
+		script += "      if (tries <= 4 || tries === 12) {";
+		script += "        var vInfo = Array.prototype.map.call(videos, function(v,i) { return 'v['+i+'](p='+v.paused+',rs='+v.readyState+',src='+(v.currentSrc||'none').substring(0,50)+')'; }).join(' ');";
+		script += "        var visEls = Array.prototype.filter.call(document.querySelectorAll('[class*=\"play\"],button,[role=\"button\"]'), function(e) { return e.offsetParent!==null && e.tagName!=='VIDEO'; });";
+		script += "        var elInfo = visEls.slice(0,5).map(function(e) { return e.tagName+'.'+String(e.className).substring(0,30); }).join(' | ');";
+		script += "        console.error('[obs-betfair] wap try='+tries+' '+(vInfo||'noVideo')+' visPlayEls='+visEls.length+': '+elInfo);";
 		script += "      }";
-		script += "      var overlay = document.querySelector('.vjs-big-play-button, [class*=\"play-overlay\"], [class*=\"play-button\"]');";
-		script += "      if (overlay && overlay.offsetParent !== null) { clearInterval(iv); overlay.click(); return; }";
-		script += "      if (tries > 20) clearInterval(iv);";
+		script += "      var anyPlaying = false;";
+		script += "      for (var i = 0; i < videos.length; i++) {";
+		script += "        if (!videos[i].paused) { videos[i].muted = false; videos[i].volume = 1; anyPlaying = true; }";
+		script += "      }";
+		script += "      if (anyPlaying) { clearInterval(_watchIv); _watchIv = null; console.error('[obs-betfair] wap ok - tocando'); return; }";
+		script += "      for (var i = 0; i < videos.length; i++) {";
+		script += "        if (videos[i].readyState >= 1) { videos[i].muted = false; videos[i].volume = 1; videos[i].play().catch(function(e) { if(tries<=4) console.error('[obs-betfair] play err: '+e); }); }";
+		script += "      }";
+		script += "      for (var s = 0; s < _playSelectors.length; s++) {";
+		script += "        var el = document.querySelector(_playSelectors[s]);";
+		script += "        if (el && el.offsetParent !== null) { el.click(); break; }";
+		script += "      }";
+		script += "      var broad = document.querySelectorAll('[class*=\"play\" i]:not(video):not(script),[class*=\"start-btn\" i],[class*=\"startBtn\" i]');";
+		script += "      for (var b = 0; b < broad.length; b++) { if (broad[b].offsetParent !== null) { broad[b].click(); break; } }";
+		script += "      var vid0 = videos[0];";
+		script += "      if (vid0 && vid0.readyState >= 1) {";
+		script += "        vid0.focus();";
+		script += "        ['keydown','keyup'].forEach(function(t) { document.dispatchEvent(new KeyboardEvent(t,{key:' ',code:'Space',keyCode:32,bubbles:true})); });";
+		script += "      }";
+		script += "      if (tries > 60) { clearInterval(_watchIv); _watchIv = null; console.error('[obs-betfair] wap timeout'); }";
 		script += "    }, 500);";
 		script += "  }";
 		script += "  function openClip(clipId, sportId) {";
-		script += "    console.error('[obs-betfair] abrindo clipId=' + clipId + ' sportId=' + sportId);";
+		script += "    console.error('[obs-betfair] openClip clipId=' + clipId + ' sportId=' + sportId);";
 		script += "    if (typeof selectClip === 'function') {";
 		script += "      selectClip(String(clipId));";
 		script += "      sendARequest('EVENT', sportId);";
-		script += "      setTimeout(watchAutoPlay, 1500);";
 		script += "    } else { console.error('[obs-betfair] selectClip nao encontrado na pagina'); }";
 		script += "  }";
 		script += "  function schedule() {";
@@ -981,6 +1028,10 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 		script += "      }";
 		script += "    });";
 		script += "    console.error('[obs-betfair] scan: ' + allClips.length + ' clips, ' + withLink + ' com link aposta, ' + matched + ' match(es) encontrado(s)');";
+		script += "    if (matched === 0 && withLink > 0) {";
+		script += "      var _sa = document.querySelector('.clip-bet a');";
+		script += "      console.error('[obs-betfair] 0 matches - href ex: ' + (_sa ? _sa.href.substring(0,120) : 'nenhum') + ' | ids config: [' + marketIds.join(',') + ']');";
+		script += "    }";
 		script += "    if (best) openClip(best.cid, best.sid);";
 		script += "  }";
 		script += "  function init() {";
@@ -994,6 +1045,43 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 		script += "})();";
 
 		frame->ExecuteJavaScript(script, "", 0);
+	}
+
+	if (!frame->IsMain() && bs->betfair_market_ids.length()) {
+		std::string frameUrl = frame->GetURL().ToString();
+		if (frameUrl.find("videoplayer.betfair") != std::string::npos ||
+		    frameUrl.find("GetPlayer.do") != std::string::npos) {
+			std::string script;
+			script += "(function() {";
+			script += "  if (window.__obsBfPlayerAuto) return;";
+			script += "  window.__obsBfPlayerAuto = true;";
+			script += "  console.error('[obs-betfair-player] iframe carregada: ' + window.location.href.substring(0,100));";
+			script += "  var _pt = 0;";
+			script += "  var _piv = setInterval(function() {";
+			script += "    _pt++;";
+			script += "    var vids = document.querySelectorAll('video');";
+			script += "    for (var i = 0; i < vids.length; i++) {";
+			script += "      if (!vids[i].paused) { vids[i].muted = false; vids[i].volume = 1; clearInterval(_piv); console.error('[obs-betfair-player] tocando ok'); return; }";
+			script += "    }";
+			script += "    var cx = window.innerWidth / 2, cy = window.innerHeight / 2;";
+			script += "    var centerEl = document.elementFromPoint(cx, cy);";
+			script += "    if (_pt <= 4) console.error('[obs-betfair-player] try='+_pt+' center=('+Math.round(cx)+','+Math.round(cy)+') el='+(centerEl?centerEl.tagName+'.'+String(centerEl.className).substring(0,50):'null')+' videos='+vids.length+(vids[0]?' rs='+vids[0].readyState+' paused='+vids[0].paused:''));";
+			script += "    if (centerEl && centerEl.tagName !== 'BODY' && centerEl.tagName !== 'HTML') {";
+			script += "      centerEl.click();";
+			script += "      if (centerEl.tagName === 'VIDEO') {";
+			script += "        centerEl.muted = false; centerEl.volume = 1;";
+			script += "        centerEl.play().catch(function(e) { if(_pt<=4) console.error('[obs-betfair-player] play err: '+e); });";
+			script += "      }";
+			script += "    }";
+			script += "    for (var i = 0; i < vids.length; i++) {";
+			script += "      if (vids[i].readyState >= 1) { vids[i].muted = false; vids[i].volume = 1; vids[i].play().catch(function() {}); }";
+			script += "    }";
+			script += "    if (_pt > 60) { clearInterval(_piv); console.error('[obs-betfair-player] timeout'); }";
+			script += "  }, 500);";
+			script += "})();";
+
+			frame->ExecuteJavaScript(script, "", 0);
+		}
 	}
 
 	if (frame->IsMain() && bs->superbet_username.length() && bs->superbet_password.length()) {
