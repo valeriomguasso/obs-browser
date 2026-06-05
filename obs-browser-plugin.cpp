@@ -202,6 +202,13 @@ static void browser_source_get_defaults(obs_data_t *settings)
 	obs_data_set_default_bool(settings, "reroute_audio", false);
 	obs_data_set_default_bool(settings, "autofill_event_ids_enabled", true);
 	obs_data_set_default_string(settings, "obs_organizer_url", "http://45.231.132.147:8090");
+#ifdef _WIN32
+	const char *userprofile = getenv("USERPROFILE");
+	if (userprofile) {
+		std::string downloads = std::string(userprofile) + "\\Downloads";
+		obs_data_set_default_string(settings, "download_path", downloads.c_str());
+	}
+#endif
 }
 
 static bool is_local_file_modified(obs_properties_t *props, obs_property_t *, obs_data_t *settings)
@@ -263,6 +270,9 @@ static obs_properties_t *browser_source_get_properties(void *data)
 
 	obs_property_t *p = obs_properties_add_text(props, "css", obs_module_text("CSS"), OBS_TEXT_MULTILINE);
 	obs_property_text_set_monospace(p, true);
+
+	obs_properties_add_path(props, "download_path", obs_module_text("DownloadPath"), OBS_PATH_DIRECTORY, nullptr,
+				nullptr);
 
 	obs_properties_add_text(props, "autofill_username", obs_module_text("AutofillUsername"), OBS_TEXT_DEFAULT);
 	obs_properties_add_text(props, "autofill_password", obs_module_text("AutofillPassword"), OBS_TEXT_PASSWORD);

@@ -76,6 +76,26 @@ CefRefPtr<CefRequestHandler> BrowserClient::GetRequestHandler()
 	return this;
 }
 
+CefRefPtr<CefDownloadHandler> BrowserClient::GetDownloadHandler()
+{
+	return this;
+}
+
+bool BrowserClient::OnBeforeDownload(CefRefPtr<CefBrowser>, CefRefPtr<CefDownloadItem>,
+				     const CefString &suggested_name,
+				     CefRefPtr<CefBeforeDownloadCallback> callback)
+{
+	if (!bs || bs->download_path.empty())
+		return false;
+
+	std::string path = bs->download_path;
+	if (path.back() != '/' && path.back() != '\\')
+		path += '\\';
+	path += suggested_name.ToString();
+	callback->Continue(path, false);
+	return true;
+}
+
 CefRefPtr<CefResourceRequestHandler> BrowserClient::GetResourceRequestHandler(CefRefPtr<CefBrowser>,
 									      CefRefPtr<CefFrame>,
 									      CefRefPtr<CefRequest> request, bool, bool,
@@ -1101,25 +1121,52 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 		script += "    el.focus();";
 		script += "    el.dispatchEvent(new Event('focus', {bubbles:true}));";
 		script += "    setter.call(el, val);";
-		script += "    el.dispatchEvent(new Event('input', {bubbles:true}));";
+		script += "    try { el.dispatchEvent(new InputEvent('input', {bubbles:true, cancelable:true, inputType:'insertText', data:val})); } catch(e) { el.dispatchEvent(new Event('input', {bubbles:true})); }";
 		script += "    el.dispatchEvent(new Event('change', {bubbles:true}));";
 		script += "    el.dispatchEvent(new Event('keyup', {bubbles:true}));";
 		script += "    el.dispatchEvent(new Event('blur', {bubbles:true}));";
 		script += "  }";
+		script += "  function findLoginBtn() {";
+		script += "    var el = document.querySelector('.e2e-login, [data-qa=\"login\"], [data-testid=\"login-button\"], [data-cy=\"login\"]');";
+		script += "    if (el) return el;";
+		script += "    var btns = document.querySelectorAll('button, a[role=\"button\"]');";
+		script += "    for (var i = 0; i < btns.length; i++) {";
+		script += "      var t = btns[i].textContent.trim();";
+		script += "      if (t === 'Entrar' || t === 'Login' || t === 'Fazer login' || t === 'Iniciar sessao') return btns[i];";
+		script += "    }";
+		script += "    return null;";
+		script += "  }";
+		script += "  function findUserInput() { return document.querySelector('input[name=\"username\"]') || document.querySelector('input[name=\"login\"]') || document.querySelector('input[autocomplete=\"username\"]') || document.querySelector('input[type=\"email\"]') || document.querySelector('input[type=\"text\"]'); }";
+		script += "  function findPassInput() { return document.querySelector('input[name=\"password\"]') || document.querySelector('input[type=\"password\"]'); }";
+		script += "  function findSubmitBtn() {";
+		script += "    var el = document.querySelector('.e2e-login-submit-btn, [data-qa=\"login-submit\"], [data-testid=\"login-submit\"]');";
+		script += "    if (el) return el;";
+		script += "    var form = document.querySelector('form');";
+		script += "    if (form) {";
+		script += "      var sub = form.querySelector('button[type=\"submit\"], button:not([type=\"button\"])');";
+		script += "      if (sub) return sub;";
+		script += "    }";
+		script += "    return null;";
+		script += "  }";
+		script += "  function isAlreadyLoggedIn() {";
+		script += "    return !document.querySelector('.e2e-login, [data-qa=\"login\"]') && !findLoginBtn();";
+		script += "  }";
 		script += "  function tryLogin() {";
-		script += "    var userEl = document.querySelector('input[name=\"username\"]');";
-		script += "    var passEl = document.querySelector('input[name=\"password\"]');";
+		script += "    var userEl = findUserInput();";
+		script += "    var passEl = findPassInput();";
 		script += "    if (!userEl || !passEl || userEl.offsetParent === null) return false;";
+		script += "    console.error('[obs-superbet] preenchendo credenciais');";
 		script += "    fillInput(userEl, u);";
 		script += "    setTimeout(function() {";
 		script += "      fillInput(passEl, p);";
 		script += "      setTimeout(function() {";
-		script += "        var btn = document.querySelector('.e2e-login-submit-btn');";
-		script += "        if (!btn) return;";
+		script += "        var btn = findSubmitBtn();";
+		script += "        if (!btn) { console.error('[obs-superbet] submit btn nao encontrado'); return; }";
+		script += "        console.error('[obs-superbet] clicando submit: ' + btn.className.substring(0,50));";
 		script += "        btn.click();";
-		script += "        setTimeout(function() { if (window.__obsSuperbetTriggerSched) window.__obsSuperbetTriggerSched(); }, 3000);";
-		script += "      }, 400);";
-		script += "    }, 300);";
+		script += "        setTimeout(function() { if (window.__obsSuperbetTriggerSched) window.__obsSuperbetTriggerSched(); }, 4000);";
+		script += "      }, 600);";
+		script += "    }, 400);";
 		script += "    return true;";
 		script += "  }";
 		script += "  var attempts = 0;";
@@ -1127,16 +1174,25 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 		script += "  function poll() {";
 		script += "    if (tryLogin()) return;";
 		script += "    var now = Date.now();";
-		script += "    if (now - _lastEntrarClick > 2000) {";
-		script += "      var entrar = document.querySelector('.e2e-login');";
-		script += "      if (entrar) { entrar.click(); _lastEntrarClick = now; }";
+		script += "    if (now - _lastEntrarClick > 2500) {";
+		script += "      var entrar = findLoginBtn();";
+		script += "      if (entrar) {";
+		script += "        console.error('[obs-superbet] clicando login btn: ' + entrar.className.substring(0,50));";
+		script += "        entrar.click(); _lastEntrarClick = now;";
+		script += "      }";
 		script += "    }";
 		script += "    attempts++;";
-		script += "    if (attempts < 30) setTimeout(poll, 1000);";
+		script += "    if (attempts < 60) setTimeout(poll, 1000);";
+		script += "    else console.error('[obs-superbet] login nao encontrado apos 60s');";
 		script += "  }";
-		script += "  setTimeout(poll, 500);";
+		script += "  if (isAlreadyLoggedIn()) {";
+		script += "    console.error('[obs-superbet] ja logado, disparando scheduler');";
+		script += "    setTimeout(function() { if (window.__obsSuperbetTriggerSched) window.__obsSuperbetTriggerSched(); }, 1000);";
+		script += "    return;";
+		script += "  }";
+		script += "  setTimeout(poll, 800);";
 		script += "  setInterval(function() {";
-		script += "    var userEl = document.querySelector('input[name=\"username\"]');";
+		script += "    var userEl = findUserInput();";
 		script += "    if (userEl && userEl.offsetParent !== null) tryLogin();";
 		script += "  }, 15000);";
 		script += "})();";

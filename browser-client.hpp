@@ -33,7 +33,8 @@ class BrowserClient : public CefClient,
 		      public CefContextMenuHandler,
 		      public CefRenderHandler,
 		      public CefAudioHandler,
-		      public CefLoadHandler {
+		      public CefLoadHandler,
+		      public CefDownloadHandler {
 
 	bool sharing_available = false;
 	bool reroute_audio = true;
@@ -70,6 +71,12 @@ public:
 	virtual CefRefPtr<CefRequestHandler> GetRequestHandler() override;
 	virtual CefRefPtr<CefContextMenuHandler> GetContextMenuHandler() override;
 	virtual CefRefPtr<CefAudioHandler> GetAudioHandler() override;
+	virtual CefRefPtr<CefDownloadHandler> GetDownloadHandler() override;
+
+	/* CefDownloadHandler */
+	virtual bool OnBeforeDownload(CefRefPtr<CefBrowser> browser, CefRefPtr<CefDownloadItem> download_item,
+				      const CefString &suggested_name,
+				      CefRefPtr<CefBeforeDownloadCallback> callback) override;
 
 	virtual bool OnProcessMessageReceived(CefRefPtr<CefBrowser> browser, CefRefPtr<CefFrame> frame,
 					      CefProcessId source_process,
