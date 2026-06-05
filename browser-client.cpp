@@ -81,10 +81,14 @@ CefRefPtr<CefDownloadHandler> BrowserClient::GetDownloadHandler()
 	return this;
 }
 
-bool BrowserClient::OnBeforeDownload(CefRefPtr<CefBrowser>, CefRefPtr<CefDownloadItem>,
+bool BrowserClient::OnBeforeDownload(CefRefPtr<CefBrowser>, CefRefPtr<CefDownloadItem> download_item,
 				     const CefString &suggested_name,
 				     CefRefPtr<CefBeforeDownloadCallback> callback)
 {
+	blog(LOG_WARNING, "[obs-browser] OnBeforeDownload: file='%s' url='%s' path='%s'",
+	     suggested_name.ToString().c_str(), download_item->GetURL().ToString().c_str(),
+	     bs ? bs->download_path.c_str() : "<no bs>");
+
 	if (!bs || bs->download_path.empty())
 		return false;
 
@@ -92,6 +96,8 @@ bool BrowserClient::OnBeforeDownload(CefRefPtr<CefBrowser>, CefRefPtr<CefDownloa
 	if (path.back() != '/' && path.back() != '\\')
 		path += '\\';
 	path += suggested_name.ToString();
+
+	blog(LOG_WARNING, "[obs-browser] saving download to: %s", path.c_str());
 	callback->Continue(path, false);
 	return true;
 }
