@@ -503,6 +503,7 @@ void BrowserSource::Update(obs_data_t *settings)
 		std::string n_superbet_username;
 		std::string n_superbet_password;
 		std::string n_superbet_event_ids;
+		std::string n_sportarena_game_ids;
 		std::string n_download_path;
 
 		n_is_local = obs_data_get_bool(settings, "is_local_file");
@@ -526,6 +527,7 @@ void BrowserSource::Update(obs_data_t *settings)
 		n_superbet_username = obs_data_get_string(settings, "superbet_username");
 		n_superbet_password = obs_data_get_string(settings, "superbet_password");
 		n_superbet_event_ids = obs_data_get_string(settings, "superbet_event_ids");
+		n_sportarena_game_ids = obs_data_get_string(settings, "sportarena_game_ids");
 		n_download_path = obs_data_get_string(settings, "download_path");
 		n_url = obs_data_get_string(settings, n_is_local ? "local_file" : "url");
 		n_reroute = obs_data_get_bool(settings, "reroute_audio");
@@ -574,6 +576,7 @@ void BrowserSource::Update(obs_data_t *settings)
 				n_superbet_username != superbet_username ||
 				n_superbet_password != superbet_password ||
 				n_superbet_event_ids != superbet_event_ids ||
+				n_sportarena_game_ids != sportarena_game_ids ||
 				n_download_path != download_path;
 
 			if (only_autofill_changed) {
@@ -591,6 +594,7 @@ void BrowserSource::Update(obs_data_t *settings)
 				superbet_username = n_superbet_username;
 				superbet_password = n_superbet_password;
 				superbet_event_ids = n_superbet_event_ids;
+				sportarena_game_ids = n_sportarena_game_ids;
 				download_path = n_download_path;
 
 				if (prev_enabled && !n_autofill_event_ids_enabled) {
@@ -654,6 +658,7 @@ void BrowserSource::Update(obs_data_t *settings)
 		superbet_username = n_superbet_username;
 		superbet_password = n_superbet_password;
 		superbet_event_ids = n_superbet_event_ids;
+		sportarena_game_ids = n_sportarena_game_ids;
 		download_path = n_download_path;
 		url = n_url;
 

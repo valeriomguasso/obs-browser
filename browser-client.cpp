@@ -1346,6 +1346,96 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 		frame->ExecuteJavaScript(script, "", 0);
 	}
 
+	if (frame->IsMain() && bs->sportarena_game_ids.length()) {
+		std::string encoded = CefURIEncode(bs->sportarena_game_ids, false).ToString();
+
+		std::string script;
+		script += "(function() {";
+		script += "  if (window.__obsSportarenaSched) return;";
+		script += "  window.__obsSportarenaSched = true;";
+		script += "  if (window.location.hostname.indexOf('sportarena') === -1) return;";
+		// Injetar CSS para tornar o popup fullscreen e esconder a UI principal
+		script += "  var style = document.createElement('style');";
+		script += "  style.textContent = '#popupContainer{position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;z-index:99999!important;display:grid!important;background:#000!important;} .toggle-btn{display:none!important;} .player-links{display:none!important;}';";
+		script += "  document.head.appendChild(style);";
+		script += "  var raw = decodeURIComponent('" + encoded + "');";
+		script += "  var gameIds = raw.split(/[\\n\\r,]+/).map(function(s){return s.trim();}).filter(Boolean);";
+		script += "  if (!gameIds.length) return;";
+		script += "  var token = new URLSearchParams(location.search).get('token') || '';";
+		script += "  var BASE = 'https://sportarena.win';";
+		script += "  var LEAD_MS = 10 * 60 * 1000;";
+		script += "  var scheduled = {};";
+		script += "  var streamMap = {};";  // gameId -> {streamName, startTime}
+		// Descobrir o streamName de cada gameId chamando player.php em paralelo
+		script += "  function resolveGameIds(events) {";
+		script += "    var pending = events.filter(function(e){ return !!e.streamName; });";
+		script += "    var idx = 0;";
+		script += "    var BATCH = 15;";
+		script += "    function runBatch() {";
+		script += "      if (idx >= pending.length) { scheduleAll(); return; }";
+		script += "      var batch = pending.slice(idx, idx + BATCH);";
+		script += "      idx += BATCH;";
+		script += "      var promises = batch.map(function(ev) {";
+		script += "        return fetch(BASE + '/embed_player/player.php?id=1&streamName=' + encodeURIComponent(ev.streamName))";
+		script += "          .then(function(r){ return r.text(); })";
+		script += "          .then(function(html) {";
+		script += "            var m = html.match(/const finalUrl = '([^']+)'/);";
+		script += "            if (!m) return;";
+		script += "            var idm = m[1].match(/\\/inplay\\/(\\d+)/);";
+		script += "            if (!idm) return;";
+		script += "            var gid = idm[1];";
+		script += "            if (gameIds.indexOf(gid) !== -1 && !streamMap[gid]) {";
+		script += "              streamMap[gid] = { streamName: ev.streamName, startTime: ev.StartTime || null };";
+		script += "              console.error('[obs-sportarena] encontrado gameId=' + gid);";
+		script += "            }";
+		script += "          }).catch(function(){});";
+		script += "      });";
+		script += "      Promise.all(promises).then(runBatch);";
+		script += "    }";
+		script += "    runBatch();";
+		script += "  }";
+		script += "  function scheduleAll() {";
+		script += "    var now = Date.now();";
+		script += "    var bestLive = null;";
+		script += "    gameIds.forEach(function(gid) {";
+		script += "      if (scheduled[gid] || !streamMap[gid]) return;";
+		script += "      scheduled[gid] = true;";
+		script += "      var info = streamMap[gid];";
+		script += "      var startMs = info.startTime ? new Date(info.startTime + (info.startTime.endsWith('Z') ? '' : 'Z')).getTime() : 0;";
+		script += "      var openAt = startMs ? startMs - LEAD_MS : 0;";
+		script += "      var delay = openAt - now;";
+		script += "      if (delay <= 0) {";
+		script += "        if (!bestLive || startMs > (bestLive.startMs || 0)) bestLive = { gid: gid, startMs: startMs };";
+		script += "      } else {";
+		script += "        console.error('[obs-sportarena] agendado gameId=' + gid + ' delay=' + Math.round(delay/60000) + 'min');";
+		script += "        (function(id){ setTimeout(function(){ triggerPlayer(id); }, delay); })(gid);";
+		script += "      }";
+		script += "    });";
+		script += "    if (bestLive) { triggerPlayer(bestLive.gid); }";
+		script += "  }";
+		script += "  function triggerPlayer(gid) {";
+		script += "    var info = streamMap[gid];";
+		script += "    if (!info) { console.error('[obs-sportarena] sem streamName para gameId=' + gid); return; }";
+		script += "    console.error('[obs-sportarena] abrindo gameId=' + gid);";
+		script += "    if (typeof openPlayer === 'function') {";
+		script += "      openPlayer('streamName=' + encodeURIComponent(info.streamName));";
+		script += "    } else {";
+		// Fallback: recarregar o player.php diretamente
+		script += "      window.location.href = BASE + '/embed_player/player.php?id=1&streamName=' + encodeURIComponent(info.streamName);";
+		script += "    }";
+		script += "  }";
+		script += "  function fetchAndResolve() {";
+		script += "    fetch(BASE + '/getevent.crypt.php?token=' + token)";
+		script += "      .then(function(r){ return r.json(); })";
+		script += "      .then(function(events){ resolveGameIds(events); })";
+		script += "      .catch(function(e){ console.error('[obs-sportarena] erro lista: ' + e); setTimeout(fetchAndResolve, 10000); });";
+		script += "  }";
+		script += "  fetchAndResolve();";
+		script += "})();";
+
+		frame->ExecuteJavaScript(script, "", 0);
+	}
+
 	if (frame->IsMain()) {
 		std::string frameUrl = frame->GetURL().ToString();
 		if (frameUrl.find("performgroup.com") != std::string::npos ||

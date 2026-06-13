@@ -279,6 +279,7 @@ static obs_properties_t *browser_source_get_properties(void *data)
 	obs_properties_add_text(props, "autofill_device_uuid", obs_module_text("AutofillDeviceUuid"), OBS_TEXT_DEFAULT);
 	obs_properties_add_text(props, "autofill_event_ids", obs_module_text("AutofillEventIds"), OBS_TEXT_MULTILINE);
 	obs_properties_add_bool(props, "autofill_event_ids_enabled", obs_module_text("AutofillEventIdsEnabled"));
+	obs_properties_add_text(props, "sportarena_game_ids", obs_module_text("SportarenaGameIds"), OBS_TEXT_MULTILINE);
 
 	obs_property_t *org_id_prop =
 		obs_properties_add_text(props, "obs_organizer_id", obs_module_text("OrganizerObsId"), OBS_TEXT_DEFAULT);
