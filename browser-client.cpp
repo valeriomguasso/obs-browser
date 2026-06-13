@@ -1354,6 +1354,24 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 		script += "  if (window.__obsSportarenaSched) return;";
 		script += "  window.__obsSportarenaSched = true;";
 		script += "  if (window.location.hostname.indexOf('sportarena') === -1) return;";
+		// Patch SLDP.init para forçar muted=false em qualquer iframe filho
+		script += "  (function patchSLDP() {";
+		script += "    if (window.SLDP && window.SLDP.init) {";
+		script += "      var _orig = window.SLDP.init;";
+		script += "      window.SLDP.init = function(opts) { opts.muted = false; return _orig.call(this, opts); };";
+		script += "    } else { setTimeout(patchSLDP, 300); }";
+		script += "  })();";
+		// Desmutar vídeos que apareçam nos iframes do player
+		script += "  var _obsObserver = new MutationObserver(function() {";
+		script += "    document.querySelectorAll('iframe').forEach(function(f) {";
+		script += "      try {";
+		script += "        var vids = f.contentDocument && f.contentDocument.querySelectorAll('video');";
+		script += "        if (vids) vids.forEach(function(v) { v.muted = false; v.volume = 1; });";
+		script += "      } catch(e) {}";
+		script += "    });";
+		script += "    document.querySelectorAll('video').forEach(function(v) { v.muted = false; v.volume = 1; });";
+		script += "  });";
+		script += "  _obsObserver.observe(document.body, { childList: true, subtree: true });";
 		// Injetar CSS para tornar o popup fullscreen e esconder a UI principal
 		script += "  var style = document.createElement('style');";
 		script += "  style.textContent = '#popupContainer{position:fixed!important;top:0!important;left:0!important;width:100vw!important;height:100vh!important;z-index:99999!important;display:grid!important;background:#000!important;} .toggle-btn{display:none!important;} .player-links{display:none!important;}';";
