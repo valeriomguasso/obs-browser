@@ -736,8 +736,9 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 		script += "    }";
 		script += "    found.click();";
 		script += "    setTimeout(function() {";
+		script += "      var hdBtn = document.querySelector('#scheduleDropdown .quality-section button[title=\"HD Live\"]');";
 		script += "      var sdBtn = document.querySelector('#scheduleDropdown .quality-section button[title=\"SD Live\"]');";
-		script += "      if (sdBtn) sdBtn.click();";
+		script += "      if (hdBtn) hdBtn.click(); else if (sdBtn) sdBtn.click();";
 		script += "      setTimeout(function() {";
 		script += "        var arrowUp = document.querySelector('.fa-arrow-up');";
 		script += "        if (arrowUp) (arrowUp.closest('button, a') || arrowUp.parentElement).click();";
@@ -1431,16 +1432,27 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 		script += "    });";
 		script += "    if (bestLive) { triggerPlayer(bestLive.gid); }";
 		script += "  }";
+		script += "  function closeAllPopups() {";
+		// Clicar nos botões de fechar existentes para que o popupCounter seja decrementado corretamente
+		script += "    document.querySelectorAll('#popupContainer .popup').forEach(function(popup) {";
+		script += "      var btn = popup.querySelector('[onclick*=\"delete_key\"]');";
+		script += "      if (btn) { btn.click(); } else { popup.remove(); }";
+		script += "    });";
+		// Garantir que o contador zerou mesmo que os botões não existam
+		script += "    try { window.popupCounter = 0; } catch(e) {}";
+		script += "  }";
 		script += "  function triggerPlayer(gid) {";
 		script += "    var info = streamMap[gid];";
 		script += "    if (!info) { console.error('[obs-sportarena] sem streamName para gameId=' + gid); return; }";
 		script += "    console.error('[obs-sportarena] abrindo gameId=' + gid);";
-		script += "    if (typeof openPlayer === 'function') {";
-		script += "      openPlayer('streamName=' + encodeURIComponent(info.streamName));";
-		script += "    } else {";
-		// Fallback: recarregar o player.php diretamente
-		script += "      window.location.href = BASE + '/embed_player/player.php?id=1&streamName=' + encodeURIComponent(info.streamName);";
-		script += "    }";
+		script += "    closeAllPopups();";
+		script += "    setTimeout(function() {";
+		script += "      if (typeof openPlayer === 'function') {";
+		script += "        openPlayer('streamName=' + encodeURIComponent(info.streamName));";
+		script += "      } else {";
+		script += "        window.location.href = BASE + '/embed_player/player.php?id=1&streamName=' + encodeURIComponent(info.streamName);";
+		script += "      }";
+		script += "    }, 300);";
 		script += "  }";
 		script += "  function fetchAndResolve() {";
 		script += "    fetch(BASE + '/getevent.crypt.php?token=' + token)";
