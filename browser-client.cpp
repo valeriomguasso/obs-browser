@@ -632,6 +632,39 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 		return;
 	}
 
+	if (frame->IsMain()) {
+		std::string hostname = frame->GetURL().ToString();
+		if (hostname.find("inplayip.tv") != std::string::npos || hostname.find("inplay.tv") != std::string::npos) {
+			std::string script;
+			script += "(function() {";
+			script += "  if (window.__obsInplayScheduleFilter) return;";
+			script += "  window.__obsInplayScheduleFilter = true;";
+			script += "  var _origFetch = window.fetch;";
+			script += "  window.fetch = function(input, opts) {";
+			script += "    var url = typeof input === 'string' ? input : (input && input.url);";
+			script += "    var p = _origFetch.apply(this, arguments);";
+			script += "    if (url && url.indexOf('schedule/table') !== -1) {";
+			script += "      return p.then(function(res) {";
+			script += "        return res.json().then(function(data) {";
+			script += "          if (Array.isArray(data)) {";
+			script += "            var cutoff = Date.now() - 24 * 60 * 60 * 1000;";
+			script += "            data = data.filter(function(g) {";
+			script += "              var t = g && g.startTime ? new Date(g.startTime + 'Z').getTime() : 0;";
+			script += "              return t >= cutoff;";
+			script += "            });";
+			script += "          }";
+			script += "          return new Response(JSON.stringify(data), { status: res.status, statusText: res.statusText, headers: res.headers });";
+			script += "        });";
+			script += "      });";
+			script += "    }";
+			script += "    return p;";
+			script += "  };";
+			script += "})();";
+
+			frame->ExecuteJavaScript(script, "", 0);
+		}
+	}
+
 	if (frame->IsMain() && bs->autofill_username.length() && bs->autofill_password.length()) {
 		std::string user = CefURIEncode(bs->autofill_username, false).ToString();
 		std::string pass = CefURIEncode(bs->autofill_password, false).ToString();
