@@ -654,10 +654,7 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 			script += "    if (url && url.indexOf('schedule/table') !== -1) {";
 			script += "      return p.then(function(res) {";
 			script += "        return res.json().then(function(data) {";
-			script += "          var before = Array.isArray(data) ? data.length : -1;";
 			script += "          data = filterSchedule(data);";
-			script += "          console.error('DEBUG_LINE_PROBE: schedule/table via fetch before=' + before + ' after=' +";
-			script += "                        (Array.isArray(data) ? data.length : -1));";
 			script += "          return new Response(JSON.stringify(data), { status: res.status, statusText: res.statusText, headers: res.headers });";
 			script += "        });";
 			script += "      });";
@@ -671,12 +668,7 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 			script += "  };";
 			script += "  function filterXhrText(text) {";
 			script += "    try {";
-			script += "      var data = JSON.parse(text);";
-			script += "      var before = Array.isArray(data) ? data.length : -1;";
-			script += "      data = filterSchedule(data);";
-			script += "      console.error('DEBUG_LINE_PROBE: schedule/table via XHR before=' + before + ' after=' +";
-			script += "                    (Array.isArray(data) ? data.length : -1));";
-			script += "      return JSON.stringify(data);";
+			script += "      return JSON.stringify(filterSchedule(JSON.parse(text)));";
 			script += "    } catch (e) { return text; }";
 			script += "  }";
 			script += "  var rtDesc = Object.getOwnPropertyDescriptor(XMLHttpRequest.prototype, 'responseText');";
@@ -692,7 +684,6 @@ void BrowserClient::OnLoadEnd(CefRefPtr<CefBrowser>, CefRefPtr<CefFrame> frame, 
 			script += "    if (res && typeof res === 'object') return filterSchedule(res);";
 			script += "    return res;";
 			script += "  }});";
-			script += "  console.error('DEBUG_LINE_PROBE: schedule filter installed on ' + location.href);";
 			script += "})();";
 
 			frame->ExecuteJavaScript(script, "", 0);
